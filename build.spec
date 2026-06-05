@@ -111,10 +111,9 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 # ========== 可执行文件 ==========
 exe_options = dict(
     pyz=pyz,
-    exe_options=a.scripts,
+    scripts=a.scripts,
     strip=False,
     upx=True,
-    runtime_tmpdir=None,  # 使用系统临时目录
     console=True,         # 保留控制台窗口（用于日志输出）
     disable_windowed_traceback=False,
     argv_emulation=False,
