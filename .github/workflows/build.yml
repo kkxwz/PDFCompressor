@@ -1,0 +1,201 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # 推送 v1.0.0 等标签时触发
+  workflow_dispatch:  # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================
+  # macOS 构建（Intel + Apple Silicon 通用）
+  # ============================================
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 安装 Ghostscript
+        run: |
+          brew install ghostscript
+          echo "GS_PATH=$(which gs)" >> $GITHUB_ENV
+
+      - name: 准备 Ghostscript 二进制
+        run: |
+          mkdir -p vendor/ghostscript
+          cp "$GS_PATH" vendor/ghostscript/gs
+          chmod +x vendor/ghostscript/gs
+          # 收集 Resource 文件
+          GS_SHARE=$(dirname $(dirname "$GS_PATH"))/share/ghostscript
+          if [ -d "$GS_SHARE" ]; then
+            GS_VER=$(ls "$GS_SHARE" | head -1)
+            if [ -d "$GS_SHARE/$GS_VER/Resource" ]; then
+              mkdir -p vendor/ghostscript/share/$GS_VER
+              cp -r "$GS_SHARE/$GS_VER/Resource" vendor/ghostscript/share/$GS_VER/
+            fi
+          fi
+          echo "Ghostscript version: $($GS_PATH --version)"
+
+      - name: PyInstaller 构建
+        run: pyinstaller build.spec --clean --noconfirm
+
+      - name: 创建 DMG
+        run: |
+          if [ -d "dist/PDF Compressor.app" ]; then
+            hdiutil create -volname "PDF Compressor" \
+              -srcfolder "dist/PDF Compressor.app" \
+              -ov -format UDZO \
+              dist/PDFCompressor-macOS.dmg
+          fi
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDFCompressor-macOS
+          path: |
+            dist/PDFCompressor-macOS.dmg
+            dist/PDF Compressor.app
+
+  # ============================================
+  # Windows x64 构建
+  # ============================================
+  build-windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 安装 Ghostscript
+        shell: pwsh
+        run: |
+          # 下载 Ghostscript Windows x64
+          $gsUrl = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/ghostscript-10.04.0-win64.zip"
+          # 尝试使用 chocolatey 安装
+          choco install ghostscript --no-progress -y
+          $gsPath = (Get-Command gswin64c -ErrorAction SilentlyContinue).Source
+          if (-not $gsPath) {
+            # 查找常见安装路径
+            $searchPaths = @(
+              "C:\Program Files\gs\*\bin\gswin64c.exe",
+              "C:\Program Files (x86)\gs\*\bin\gswin64c.exe"
+            )
+            foreach ($pattern in $searchPaths) {
+              $found = Get-Item $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($found) { $gsPath = $found.FullName; break }
+            }
+          }
+          if ($gsPath) {
+            Write-Host "Found Ghostscript: $gsPath"
+            $binDir = Split-Path $gsPath -Parent
+            $destDir = "vendor\ghostscript\x64"
+            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+            Copy-Item "$gsPath" "$destDir\" -Force
+            Copy-Item "$binDir\*.dll" "$destDir\" -Force
+            $libDir = Join-Path (Split-Path $binDir -Parent) "lib"
+            if (Test-Path $libDir) {
+              Copy-Item -Recurse -Force "$libDir" "$destDir\lib"
+            }
+          } else {
+            Write-Host "WARNING: Ghostscript not found, build may fail"
+          }
+
+      - name: PyInstaller 构建
+        run: pyinstaller build.spec --clean --noconfirm
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDFCompressor-Windows-x64
+          path: dist/PDFCompressor.exe
+
+  # ============================================
+  # Windows ARM64 构建
+  # ============================================
+  build-windows-arm64:
+    runs-on: windows-11-arm  # GitHub Actions Windows ARM runner
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 安装 Python 依赖
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 安装 Ghostscript ARM64
+        shell: pwsh
+        run: |
+          # 下载 Ghostscript Windows ARM64 (如果可用)
+          # 目前 Ghostscript 官方尚未提供独立的 ARM64 版本
+          # ARM64 Windows 可通过 x64 模拟运行 gswin64c.exe
+          $gsUrl = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/ghostscript-10.04.0-win64.zip"
+          $gsZip = "$env:TEMP\gs.zip"
+          $gsExtract = "$env:TEMP\gs_extract"
+
+          try {
+            Invoke-WebRequest -Uri $gsUrl -OutFile $gsZip -UseBasicParsing
+            Expand-Archive -Path $gsZip -DestinationPath $gsExtract -Force
+            $binDir = Get-ChildItem "$gsExtract\*\bin" -Directory | Select-Object -First 1
+            if ($binDir) {
+              $destDir = "vendor\ghostscript\arm64"
+              New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+              Copy-Item "$($binDir.FullName)\gswin64c.exe" "$destDir\" -Force
+              Copy-Item "$($binDir.FullName)\*.dll" "$destDir\" -Force
+              $libDir = Join-Path (Split-Path $binDir.FullName -Parent) "lib"
+              if (Test-Path $libDir) {
+                Copy-Item -Recurse -Force "$libDir" "$destDir\lib"
+              }
+              Write-Host "Ghostscript ARM64 prepared"
+            }
+          } catch {
+            Write-Host "WARNING: Could not download Ghostscript: $_"
+            Write-Host "Falling back to system Ghostscript if available"
+          }
+
+      - name: PyInstaller 构建
+        run: pyinstaller build.spec --clean --noconfirm
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: PDFCompressor-Windows-ARM64
+          path: dist/PDFCompressor.exe
+
+  # ============================================
+  # 发布 Release
+  # ============================================
+  release:
+    needs: [build-macos, build-windows-x64, build-windows-arm64]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: 下载所有产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/PDFCompressor-macOS/PDFCompressor-macOS.dmg
+            artifacts/PDFCompressor-Windows-x64/PDFCompressor.exe
+            artifacts/PDFCompressor-Windows-ARM64/PDFCompressor.exe
+          generate_release_notes: true
+          draft: false

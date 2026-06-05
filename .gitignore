@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# PyInstaller
+*.manifest
+*.spec.bak
+
+# 上传/输出临时文件
+uploads/
+outputs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+*.dmg
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# vendor Ghostscript (构建时动态生成，不提交到仓库)
+vendor/ghostscript/**/gs
+vendor/ghostscript/**/*.exe
+vendor/ghostscript/**/*.dll
+vendor/ghostscript/**/lib/
+vendor/ghostscript/**/share/
+
+# 保留目录结构的占位文件
+!vendor/ghostscript/.gitkeep
