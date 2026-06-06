@@ -125,10 +125,8 @@ exe_options = dict(
 if system == 'Darwin':
     # macOS: 生成 .app bundle
     exe_options['name'] = 'PDFCompressor'
-    exe = EXE(
-        **exe_options,
-        exclude_binaries=True,  # macOS COLLECT 需要
-    )
+    exe_options['exclude_binaries'] = True  # macOS COLLECT 需要
+    exe = EXE(**exe_options)
     coll = COLLECT(
         exe,
         a.binaries,
@@ -157,10 +155,8 @@ else:
     # Windows/Linux: 生成单文件 exe
     exe_options['name'] = 'PDFCompressor'
     exe_options['icon'] = None  # 可设置 .ico 图标文件路径
-    exe = EXE(
-        **exe_options,
-        a.binaries,
-        a.zipfiles,
-        a.datas,
-        exclude_binaries=False,
-    )
+    exe_options['binaries'] = a.binaries
+    exe_options['zipfiles'] = a.zipfiles
+    exe_options['datas'] = a.datas
+    exe_options['exclude_binaries'] = False
+    exe = EXE(**exe_options)
