@@ -1,41 +1,41 @@
 """
-PDF 压缩参数预设 - 三档压缩配置
+PDF Compression Parameter Presets - Three compression levels
 
-Ghostscript 自定义参数，不使用预设，精确控制压缩率与质量平衡。
-关键参数说明：
-- QFactor: 0.40≈JPEG85-90(近无损), 0.76≈JPEG50-60(甜点), 0.90≈JPEG35-40(可接受)
-- HSamples/VSamples: [2 1 1 2] 做 4:2:0 色度子采样，额外节省25%
-- 降采样算法: Bicubic 最平滑，Average 更快
+Ghostscript custom parameters, no presets used, precise control over compression rate and quality balance.
+Key parameter notes:
+- QFactor: 0.40≈JPEG85-90(near-lossless), 0.76≈JPEG50-60(sweet spot), 0.90≈JPEG35-40(acceptable)
+- HSamples/VSamples: [2 1 1 2] for 4:2:0 chroma subsampling, extra 25% savings
+- Downsampling algorithm: Bicubic smoothest, Average faster
 """
 
 
-# 低压缩（高质量优先）- 视觉无损
-# 预期压缩率 50-70%，适合打印或精细查看
+# Low compression (high quality priority) - visually lossless
+# Expected compression 50-70%, suitable for printing or detailed viewing
 LOW_COMPRESSION = {
-    "name": "低压缩（高质量）",
-    "description": "视觉无损，适合打印或精细查看",
+    "name": "Low Compression (High Quality)",
+    "description": "Visually lossless, suitable for printing or detailed viewing",
 
-    # 基础设置
+    # Base settings
     "compatibility_level": "1.7",
 
-    # 彩色图像降采样 - 高分辨率保持
+    # Color image downsampling - high resolution preserved
     "DownsampleColorImages": True,
     "ColorImageResolution": 200,
     "ColorImageDownsampleType": "/Bicubic",
     "ColorImageDownsampleThreshold": 1.5,
 
-    # 灰度图像
+    # Grayscale images
     "DownsampleGrayImages": True,
     "GrayImageResolution": 200,
     "GrayImageDownsampleType": "/Bicubic",
     "GrayImageDownsampleThreshold": 1.5,
 
-    # 黑白图像 - 保持高分辨率（文字清晰）
+    # Monochrome images - keep high resolution (text clarity)
     "DownsampleMonoImages": True,
     "MonoImageResolution": 600,
     "MonoImageDownsampleType": "/Subsample",
 
-    # JPEG 压缩质量 - QFactor 0.40 ≈ JPEG quality 85-90
+    # JPEG compression quality - QFactor 0.40 ≈ JPEG quality 85-90
     "ColorImageQFactor": 0.40,
     "ColorHSamples": "[1 1 1 1]",
     "ColorVSamples": "[1 1 1 1]",
@@ -43,48 +43,48 @@ LOW_COMPRESSION = {
     "GrayHSamples": "[1 1 1 1]",
     "GrayVSamples": "[1 1 1 1]",
 
-    # 颜色空间 - 不转换，保持原色
+    # Color space - no conversion, preserve original
     "ColorConversionStrategy": "/LeaveColorUnchanged",
 
-    # 字体
+    # Fonts
     "EmbedAllFonts": True,
     "SubsetFonts": True,
     "CompressFonts": True,
 
-    # 优化
+    # Optimization
     "DetectDuplicateImages": True,
     "AutoFilterColorImages": True,
     "AutoFilterGrayImages": True,
 }
 
 
-# 中压缩（平衡档）- 推荐，目标 20MB -> 2MB
-# 预期压缩率 80-90%，日常分享、邮件附件
+# Medium compression (balanced) - recommended, target 20MB -> 2MB
+# Expected compression 80-90%, daily sharing, email attachments
 MEDIUM_COMPRESSION = {
-    "name": "中压缩（推荐）",
-    "description": "视觉质量优秀，文件大小显著减小",
+    "name": "Medium Compression (Recommended)",
+    "description": "Excellent visual quality with significantly reduced file size",
 
-    # 基础设置
+    # Base settings
     "compatibility_level": "1.5",
 
-    # 彩色图像降采样 - 平衡分辨率
+    # Color image downsampling - balanced resolution
     "DownsampleColorImages": True,
     "ColorImageResolution": 150,
     "ColorImageDownsampleType": "/Bicubic",
     "ColorImageDownsampleThreshold": 1.1,
 
-    # 灰度图像
+    # Grayscale images
     "DownsampleGrayImages": True,
     "GrayImageResolution": 150,
     "GrayImageDownsampleType": "/Bicubic",
     "GrayImageDownsampleThreshold": 1.1,
 
-    # 黑白图像 - 适度降采样
+    # Monochrome images - moderate downsampling
     "DownsampleMonoImages": True,
     "MonoImageResolution": 300,
     "MonoImageDownsampleType": "/Subsample",
 
-    # JPEG 压缩质量 - QFactor 0.76 ≈ JPEG quality 50-60（甜点）
+    # JPEG compression quality - QFactor 0.76 ≈ JPEG quality 50-60 (sweet spot)
     "ColorImageQFactor": 0.76,
     "ColorHSamples": "[2 1 1 2]",
     "ColorVSamples": "[2 1 1 2]",
@@ -92,20 +92,20 @@ MEDIUM_COMPRESSION = {
     "GrayHSamples": "[2 1 1 2]",
     "GrayVSamples": "[2 1 1 2]",
 
-    # 颜色空间 - 转 RGB（CMYK 转 RGB 可节省 25% 图像数据）
+    # Color space - convert to RGB (CMYK to RGB saves 25% image data)
     "ColorConversionStrategy": "/RGB",
 
-    # 字体
+    # Fonts
     "EmbedAllFonts": True,
     "SubsetFonts": True,
     "CompressFonts": True,
 
-    # 优化
+    # Optimization
     "DetectDuplicateImages": True,
     "AutoFilterColorImages": True,
     "AutoFilterGrayImages": True,
 
-    # 额外优化
+    # Extra optimization
     "Optimize": True,
     "PreserveHalftoneInfo": False,
     "PreserveOverprintSettings": False,
@@ -114,34 +114,34 @@ MEDIUM_COMPRESSION = {
 }
 
 
-# 高压缩（极致压缩）- 文件大小最小化
-# 预期压缩率 85-95%，保持可读性
+# High compression (maximum compression) - minimize file size
+# Expected compression 85-95%, maintain readability
 HIGH_COMPRESSION = {
-    "name": "高压缩（最小体积）",
-    "description": "文件大小最小化，保持可读性",
+    "name": "High Compression (Smallest Size)",
+    "description": "Minimize file size while maintaining readability",
 
-    # 基础设置
+    # Base settings
     "compatibility_level": "1.5",
 
-    # 彩色图像降采样 - 更激进
+    # Color image downsampling - more aggressive
     "DownsampleColorImages": True,
     "ColorImageResolution": 100,
     "ColorImageDownsampleType": "/Average",
     "ColorImageDownsampleThreshold": 1.0,
 
-    # 灰度图像
+    # Grayscale images
     "DownsampleGrayImages": True,
     "GrayImageResolution": 100,
     "GrayImageDownsampleType": "/Average",
     "GrayImageDownsampleThreshold": 1.0,
 
-    # 黑白图像
+    # Monochrome images
     "DownsampleMonoImages": True,
     "MonoImageResolution": 300,
     "MonoImageDownsampleType": "/Subsample",
     "MonoImageDownsampleThreshold": 1.0,
 
-    # JPEG 压缩质量 - QFactor 0.90 ≈ JPEG quality 35-40
+    # JPEG compression quality - QFactor 0.90 ≈ JPEG quality 35-40
     "ColorImageQFactor": 0.90,
     "ColorHSamples": "[2 1 1 2]",
     "ColorVSamples": "[2 1 1 2]",
@@ -149,15 +149,15 @@ HIGH_COMPRESSION = {
     "GrayHSamples": "[2 1 1 2]",
     "GrayVSamples": "[2 1 1 2]",
 
-    # 颜色空间 - 转 RGB
+    # Color space - convert to RGB
     "ColorConversionStrategy": "/RGB",
 
-    # 字体 - 最小化字体嵌入
+    # Fonts - minimize font embedding
     "EmbedAllFonts": False,
     "SubsetFonts": True,
     "CompressFonts": True,
 
-    # 全面优化
+    # Full optimization
     "DetectDuplicateImages": True,
     "AutoFilterColorImages": True,
     "AutoFilterGrayImages": True,
@@ -170,7 +170,7 @@ HIGH_COMPRESSION = {
 }
 
 
-# 压缩级别映射
+# Compression level mapping
 COMPRESSION_PROFILES = {
     "low": LOW_COMPRESSION,
     "medium": MEDIUM_COMPRESSION,
@@ -179,7 +179,7 @@ COMPRESSION_PROFILES = {
 
 
 def get_profile(level: str) -> dict:
-    """获取指定级别的压缩参数"""
+    """Get compression parameters for specified level"""
     if level not in COMPRESSION_PROFILES:
-        raise ValueError(f"未知的压缩级别: {level}，可选: {list(COMPRESSION_PROFILES.keys())}")
+        raise ValueError(f"Unknown compression level: {level}, available: {list(COMPRESSION_PROFILES.keys())}")
     return COMPRESSION_PROFILES[level]

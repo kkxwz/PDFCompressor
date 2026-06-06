@@ -1,5 +1,5 @@
 """
-压缩任务路由 - 启动压缩、进度推送、下载结果
+Compression Task Routes - Start compression, progress push, download result
 """
 import os
 import json
@@ -14,14 +14,14 @@ compress_bp = Blueprint("compress", __name__)
 
 
 def _find_upload_file(file_id: str) -> tuple:
-    """根据 file_id 查找上传的文件，返回 (文件路径, 原始文件名)"""
+    """Find uploaded file by file_id, return (file_path, original_filename)"""
     pattern = os.path.join(config.UPLOAD_FOLDER, f"{file_id}_*.pdf")
     matches = glob.glob(pattern)
     if not matches:
         return None, None
 
     file_path = matches[0]
-    # 提取原始文件名（去掉 file_id_ 前缀）
+    # Extract original filename (strip file_id_ prefix)
     basename = os.path.basename(file_path)
     original_filename = basename[len(file_id) + 1:]  # +1 for underscore
     return file_path, original_filename
@@ -29,13 +29,13 @@ def _find_upload_file(file_id: str) -> tuple:
 
 @compress_bp.route("/api/compress", methods=["POST"])
 def start_compress():
-    """启动压缩任务"""
+    """Start compression task"""
     data = request.get_json()
 
     if not data:
         return jsonify({
             "error": "INVALID_REQUEST",
-            "message": "请求数据无效"
+            "message": "Invalid request data"
         }), 400
 
     file_id = data.get("file_id")
@@ -44,24 +44,24 @@ def start_compress():
     if not file_id:
         return jsonify({
             "error": "MISSING_FILE_ID",
-            "message": "缺少 file_id"
+            "message": "Missing file_id"
         }), 400
 
     if level not in ("low", "medium", "high"):
         return jsonify({
             "error": "INVALID_LEVEL",
-            "message": "无效的压缩级别，可选: low, medium, high"
+            "message": "Invalid compression level, available: low, medium, high"
         }), 400
 
-    # 查找上传的文件
+    # Find uploaded file
     input_path, original_filename = _find_upload_file(file_id)
     if not input_path:
         return jsonify({
             "error": "FILE_NOT_FOUND",
-            "message": "未找到上传的文件，请重新上传"
+            "message": "Uploaded file not found, please re-upload"
         }), 404
 
-    # 创建并启动任务
+    # Create and start task
     task_manager = get_task_manager()
     task = task_manager.create_task(
         file_id=file_id,
@@ -80,25 +80,25 @@ def start_compress():
 
 @compress_bp.route("/api/progress/<task_id>")
 def get_progress(task_id: str):
-    """SSE 进度推送"""
+    """SSE progress push"""
     task_manager = get_task_manager()
     task = task_manager.get_task(task_id)
 
     if not task:
         return jsonify({
             "error": "TASK_NOT_FOUND",
-            "message": "任务不存在"
+            "message": "Task not found"
         }), 404
 
     def generate():
-        """生成 SSE 事件流"""
+        """Generate SSE event stream"""
         last_progress = -1
 
         while True:
             current_progress = task.progress
             current_status = task.status
 
-            # 只在进度更新时发送事件
+            # Only send event when progress updates
             if current_progress != last_progress or current_status in (TaskStatus.DONE, TaskStatus.ERROR):
                 data = {
                     "stage": current_status,
@@ -115,7 +115,7 @@ def get_progress(task_id: str):
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 last_progress = current_progress
 
-                # 任务完成或失败时结束流
+                # End stream when task completes or fails
                 if current_status in (TaskStatus.DONE, TaskStatus.ERROR):
                     break
 
@@ -126,36 +126,36 @@ def get_progress(task_id: str):
         mimetype="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # nginx 禁用缓冲
+            "X-Accel-Buffering": "no",  # nginx disable buffering
         }
     )
 
 
 @compress_bp.route("/api/download/<task_id>")
 def download_file(task_id: str):
-    """下载压缩结果"""
+    """Download compression result"""
     task_manager = get_task_manager()
     task = task_manager.get_task(task_id)
 
     if not task:
         return jsonify({
             "error": "TASK_NOT_FOUND",
-            "message": "任务不存在"
+            "message": "Task not found"
         }), 404
 
     if task.status != TaskStatus.DONE:
         return jsonify({
             "error": "NOT_READY",
-            "message": f"任务尚未完成（当前状态: {task.status}）"
+            "message": f"Task not yet complete (current status: {task.status})"
         }), 400
 
     if not os.path.isfile(task.output_path):
         return jsonify({
             "error": "FILE_NOT_FOUND",
-            "message": "输出文件不存在，可能已过期被清理"
+            "message": "Output file not found, may have been cleaned up"
         }), 404
 
-    # 生成下载文件名
+    # Generate download filename
     original_name = task.original_filename
     if original_name.lower().endswith(".pdf"):
         download_name = original_name[:-4] + "_compressed.pdf"

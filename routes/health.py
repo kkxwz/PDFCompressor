@@ -1,5 +1,5 @@
 """
-健康检查路由 - 检测 Ghostscript 可用性
+Health Check Routes - Detect Ghostscript availability
 """
 from flask import Blueprint, jsonify
 
@@ -10,7 +10,7 @@ health_bp = Blueprint("health", __name__)
 
 @health_bp.route("/api/health")
 def health_check():
-    """健康检查"""
+    """Health check"""
     gs_path = find_ghostscript()
     gs_version = None
 
@@ -24,5 +24,5 @@ def health_check():
             "path": gs_path,
             "version": gs_version
         },
-        "message": "Ghostscript 已就绪" if gs_path else "未找到 Ghostscript，压缩功能不可用"
+        "message": "Ghostscript ready" if gs_path else "Ghostscript not found, compression unavailable"
     })

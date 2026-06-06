@@ -1,5 +1,5 @@
 """
-文件上传路由
+File Upload Routes
 """
 import os
 import uuid
@@ -12,13 +12,13 @@ upload_bp = Blueprint("upload", __name__)
 
 
 def allowed_file(filename: str) -> bool:
-    """检查文件扩展名是否允许"""
+    """Check if file extension is allowed"""
     return "." in filename and \
            filename.rsplit(".", 1)[1].lower() in config.ALLOWED_EXTENSIONS
 
 
 def format_size(size_bytes: int) -> str:
-    """格式化文件大小"""
+    """Format file size"""
     if size_bytes < 1024:
         return f"{size_bytes} B"
     elif size_bytes < 1024 * 1024:
@@ -31,12 +31,12 @@ def format_size(size_bytes: int) -> str:
 
 @upload_bp.route("/api/upload", methods=["POST"])
 def upload_file():
-    """上传 PDF 文件"""
-    # 检查是否有文件
+    """Upload PDF file"""
+    # Check if file exists in request
     if "file" not in request.files:
         return jsonify({
             "error": "NO_FILE",
-            "message": "未选择文件"
+            "message": "No file selected"
         }), 400
 
     file = request.files["file"]
@@ -44,23 +44,23 @@ def upload_file():
     if file.filename == "":
         return jsonify({
             "error": "NO_FILE",
-            "message": "未选择文件"
+            "message": "No file selected"
         }), 400
 
-    # 检查文件类型
+    # Check file type
     if not allowed_file(file.filename):
         return jsonify({
             "error": "ONLY_PDF",
-            "message": "仅支持 PDF 格式文件"
+            "message": "Only PDF format files are supported"
         }), 400
 
-    # 生成唯一文件 ID
+    # Generate unique file ID
     file_id = str(uuid.uuid4())
     original_filename = secure_filename(file.filename)
     if not original_filename:
         original_filename = "document.pdf"
 
-    # 保存文件
+    # Save file
     save_filename = f"{file_id}_{original_filename}"
     save_path = os.path.join(config.UPLOAD_FOLDER, save_filename)
 
@@ -69,18 +69,18 @@ def upload_file():
     except Exception as e:
         return jsonify({
             "error": "SAVE_FAILED",
-            "message": f"文件保存失败: {str(e)}"
+            "message": f"File save failed: {str(e)}"
         }), 500
 
-    # 获取文件大小
+    # Get file size
     file_size = os.path.getsize(save_path)
 
-    # 检查文件大小限制
+    # Check file size limit
     if file_size > config.MAX_CONTENT_LENGTH:
         os.remove(save_path)
         return jsonify({
             "error": "FILE_TOO_LARGE",
-            "message": f"文件过大（{format_size(file_size)}），最大支持 {format_size(config.MAX_CONTENT_LENGTH)}"
+            "message": f"File too large ({format_size(file_size)}), max supported {format_size(config.MAX_CONTENT_LENGTH)}"
         }), 400
 
     return jsonify({

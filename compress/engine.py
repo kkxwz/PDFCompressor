@@ -1,8 +1,8 @@
 """
-Ghostscript 压缩引擎 - 核心压缩逻辑
+Ghostscript Compression Engine - Core compression logic
 
-封装 Ghostscript 调用，将压缩参数字典转换为命令行执行。
-支持进度回调，用于实时推送压缩进度。
+Wraps Ghostscript calls, converting compression parameter dicts to CLI commands.
+Supports progress callbacks for real-time compression progress.
 """
 import os
 import re
@@ -18,14 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 def find_ghostscript() -> Optional[str]:
-    """查找 Ghostscript 可执行文件路径"""
+    """Find Ghostscript executable path"""
     for path in config.GS_PATHS:
         if os.path.isabs(path):
-            # 绝对路径，直接检查
+            # Absolute path, check directly
             if os.path.isfile(path) and os.access(path, os.X_OK):
                 return path
         else:
-            # 相对路径或命令名，使用 shutil.which 查找
+            # Relative path or command name, use shutil.which
             found = shutil.which(path)
             if found:
                 return found
@@ -33,7 +33,7 @@ def find_ghostscript() -> Optional[str]:
 
 
 def get_gs_version(gs_path: str) -> Optional[str]:
-    """获取 Ghostscript 版本"""
+    """Get Ghostscript version"""
     try:
         result = subprocess.run(
             [gs_path, "--version"],
@@ -45,12 +45,12 @@ def get_gs_version(gs_path: str) -> Optional[str]:
 
 
 def _validate_pdf_path(path: str) -> bool:
-    """确保路径是安全的 PDF 文件路径"""
+    """Ensure path is a safe PDF file path"""
     if not os.path.isfile(path):
         return False
     if not path.lower().endswith('.pdf'):
         return False
-    # 禁止路径遍历：确保解析后的路径在允许的目录内
+    # Prevent path traversal: ensure resolved path is within allowed directories
     real_path = os.path.realpath(path)
     upload_dir = os.path.realpath(config.UPLOAD_FOLDER)
     output_dir = os.path.realpath(config.OUTPUT_FOLDER)
@@ -60,13 +60,13 @@ def _validate_pdf_path(path: str) -> bool:
 def _build_gs_command(gs_path: str, input_path: str, output_path: str,
                       profile: dict) -> list:
     """
-    构建 Ghostscript 命令行参数列表
+    Build Ghostscript CLI argument list
 
-    注意：ACS ImageDict 必须通过 -c PostScript 代码传入，不能用 -d 参数。
+    Note: ACS ImageDict must be passed via -c PostScript code, not -d params.
     """
     cmd = [gs_path]
 
-    # 基础参数
+    # Base params
     cmd.extend([
         "-sDEVICE=pdfwrite",
         f"-dCompatibilityLevel={profile.get('compatibility_level', '1.5')}",
@@ -75,7 +75,7 @@ def _build_gs_command(gs_path: str, input_path: str, output_path: str,
         "-dSAFER",
     ])
 
-    # 图像降采样参数
+    # Image downsampling params
     bool_params = [
         "DownsampleColorImages", "DownsampleGrayImages", "DownsampleMonoImages",
         "EmbedAllFonts", "SubsetFonts", "CompressFonts",
@@ -99,31 +99,31 @@ def _build_gs_command(gs_path: str, input_path: str, output_path: str,
         "TransferFunctionInfo", "UCRandBGInfo",
     ]
 
-    # 添加布尔参数
+    # Add boolean params
     for param in bool_params:
         if param in profile:
             value = "true" if profile[param] else "false"
             cmd.append(f"-d{param}={value}")
 
-    # 添加整数参数
+    # Add integer params
     for param in int_params:
         if param in profile:
             cmd.append(f"-d{param}={profile[param]}")
 
-    # 添加浮点参数
+    # Add float params
     for param in float_params:
         if param in profile:
             cmd.append(f"-d{param}={profile[param]}")
 
-    # 添加字符串参数（带 / 前缀的 PostScript 名称）
+    # Add string params (PostScript names with / prefix)
     for param in str_params:
         if param in profile:
             cmd.append(f"-d{param}={profile[param]}")
 
-    # 构建 PostScript 代码设置 ACS ImageDict（必须通过 -c 传入）
+    # Build PostScript code for ACS ImageDict (must pass via -c)
     ps_code = "<< "
 
-    # 彩色图像 ACS ImageDict
+    # Color image ACS ImageDict
     if "ColorImageQFactor" in profile:
         qfactor = profile["ColorImageQFactor"]
         h_samples = profile.get("ColorHSamples", "[1 1 1 1]")
@@ -133,7 +133,7 @@ def _build_gs_command(gs_path: str, input_path: str, output_path: str,
             f"/ColorTransform 1 /HSamples {h_samples} /VSamples {v_samples} >> "
         )
 
-    # 灰度图像 ACS ImageDict
+    # Grayscale image ACS ImageDict
     if "GrayImageQFactor" in profile:
         qfactor = profile["GrayImageQFactor"]
         h_samples = profile.get("GrayHSamples", "[1 1 1 1]")
@@ -145,13 +145,13 @@ def _build_gs_command(gs_path: str, input_path: str, output_path: str,
 
     ps_code += ">> setdistillerparams"
 
-    # 输出文件（必须在 -c 和 -f 之前）
+    # Output file (must be before -c and -f)
     cmd.append(f"-sOutputFile={output_path}")
 
-    # PostScript 代码设置 ACS ImageDict
+    # PostScript code for ACS ImageDict
     cmd.extend(["-c", ps_code])
 
-    # 输入文件（-f 必须在 -c 之后）
+    # Input file (-f must come after -c)
     cmd.extend(["-f", input_path])
 
     return cmd
@@ -159,18 +159,18 @@ def _build_gs_command(gs_path: str, input_path: str, output_path: str,
 
 def _parse_progress(line: str, total_pages: int) -> Optional[int]:
     """
-    从 Ghostscript 输出中解析进度
+    Parse progress from Ghostscript output
 
-    Ghostscript 输出格式示例：
-    - "Processing pages 1 through 12."（开始处理）
-    - "Page 1" / "Page 2"（处理每页）
+    Ghostscript output format examples:
+    - "Processing pages 1 through 12." (start processing)
+    - "Page 1" / "Page 2" (per page)
     """
-    # 尝试解析总页数
+    # Try to parse total pages
     match = re.search(r"Processing pages \d+ through (\d+)", line)
     if match:
-        return 0  # 返回 0 表示已获取总页数
+        return 0  # Return 0 means total pages acquired
 
-    # 尝试解析当前页
+    # Try to parse current page
     match = re.search(r"Page (\d+)", line)
     if match and total_pages > 0:
         current_page = int(match.group(1))
@@ -181,7 +181,7 @@ def _parse_progress(line: str, total_pages: int) -> Optional[int]:
 
 
 def _get_total_pages(gs_path: str, input_path: str) -> int:
-    """获取 PDF 总页数"""
+    """Get total PDF page count"""
     try:
         cmd = [
             gs_path,
@@ -195,7 +195,7 @@ def _get_total_pages(gs_path: str, input_path: str) -> int:
         if match:
             return int(match.group(1))
     except Exception as e:
-        logger.warning(f"获取 PDF 页数失败: {e}")
+        logger.warning(f"Failed to get PDF page count: {e}")
 
     return 0
 
@@ -208,17 +208,17 @@ def compress_pdf(
     timeout: int = None
 ) -> dict:
     """
-    压缩 PDF 文件
+    Compress PDF file
 
     Args:
-        input_path: 输入 PDF 文件路径
-        output_path: 输出 PDF 文件路径
-        level: 压缩级别 (low/medium/high)
-        progress_callback: 进度回调函数 callback(progress_percent, stage_message)
-        timeout: 超时时间（秒）
+        input_path: Input PDF file path
+        output_path: Output PDF file path
+        level: Compression level (low/medium/high)
+        progress_callback: Progress callback function callback(progress_percent, stage_message)
+        timeout: Timeout in seconds
 
     Returns:
-        dict: 压缩结果 {
+        dict: Compression result {
             "success": bool,
             "original_size": int,
             "compressed_size": int,
@@ -229,55 +229,55 @@ def compress_pdf(
     if timeout is None:
         timeout = config.COMPRESS_TIMEOUT
 
-    # 获取压缩参数
+    # Get compression profile
     profile = get_profile(level)
 
-    # 查找 Ghostscript
+    # Find Ghostscript
     gs_path = find_ghostscript()
     if not gs_path:
         return {
             "success": False,
-            "error": "未找到 Ghostscript，请安装 Ghostscript 后重试"
+            "error": "Ghostscript not found. Please install Ghostscript and try again."
         }
 
-    # 检查输入文件
+    # Check input file
     if not os.path.isfile(input_path):
         return {
             "success": False,
-            "error": f"输入文件不存在: {input_path}"
+            "error": f"Input file not found: {input_path}"
         }
 
-    # 校验文件路径安全性（防止路径遍历和参数注入）
+    # Validate file path security (prevent path traversal and parameter injection)
     if not _validate_pdf_path(input_path):
         return {
             "success": False,
-            "error": "无效的文件路径"
+            "error": "Invalid file path"
         }
 
-    # 校验输出路径安全性
+    # Validate output path security
     if not _validate_pdf_path(output_path):
         return {
             "success": False,
-            "error": "无效的输出路径"
+            "error": "Invalid output path"
         }
 
     original_size = os.path.getsize(input_path)
 
     if progress_callback:
-        progress_callback(5, "正在分析 PDF 文件...")
+        progress_callback(5, "Analyzing PDF file...")
 
-    # 获取总页数
+    # Get total pages
     total_pages = _get_total_pages(gs_path, input_path)
 
     if progress_callback:
-        progress_callback(10, "正在压缩 PDF...")
+        progress_callback(10, "Compressing PDF...")
 
-    # 构建命令
+    # Build command
     cmd = _build_gs_command(gs_path, input_path, output_path, profile)
-    logger.info(f"执行命令: {' '.join(cmd)}")
+    logger.info(f"Executing command: {' '.join(cmd)}")
 
     try:
-        # 执行 Ghostscript
+        # Execute Ghostscript
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -285,7 +285,7 @@ def compress_pdf(
             text=True
         )
 
-        # 实时读取输出
+        # Read output in real-time
         current_progress = 10
         for line in process.stderr:
             line = line.strip()
@@ -294,69 +294,69 @@ def compress_pdf(
                 if progress is not None and progress > current_progress:
                     current_progress = progress
                     if total_pages > 0:
-                        # 从 line 中提取当前页码
+                        # Extract current page from line
                         match = re.search(r"Page (\d+)", line)
                         if match:
                             page_num = match.group(1)
                             if progress_callback:
                                 progress_callback(
                                     current_progress,
-                                    f"正在压缩第 {page_num}/{total_pages} 页..."
+                                    f"Compressing page {page_num}/{total_pages}..."
                                 )
                     else:
                         if progress_callback:
-                            progress_callback(current_progress, "正在压缩...")
+                            progress_callback(current_progress, "Compressing...")
 
-        # 等待完成
+        # Wait for completion
         process.wait(timeout=timeout)
 
         if process.returncode != 0:
             stderr_output = process.stderr.read() if process.stderr else ""
             return {
                 "success": False,
-                "error": f"Ghostscript 执行失败 (code={process.returncode}): {stderr_output}"
+                "error": f"Ghostscript failed (code={process.returncode}): {stderr_output}"
             }
 
     except subprocess.TimeoutExpired:
         process.kill()
         return {
             "success": False,
-            "error": f"压缩超时（超过 {timeout} 秒），请尝试使用更小的文件或更低的压缩级别"
+            "error": f"Compression timed out (exceeded {timeout}s). Try a smaller file or lower compression level."
         }
     except Exception as e:
-        logger.exception("压缩过程发生异常")
+        logger.exception("Compression error")
         return {
             "success": False,
-            "error": f"压缩过程发生异常: {str(e)}"
+            "error": f"Compression error: {str(e)}"
         }
 
-    # 检查输出文件
+    # Check output file
     if not os.path.isfile(output_path):
         return {
             "success": False,
-            "error": "压缩失败：未生成输出文件"
+            "error": "Compression failed: no output file generated"
         }
 
     compressed_size = os.path.getsize(output_path)
 
-    # 如果压缩后反而变大，返回原文件
+    # If compressed file is larger, return original
     if compressed_size >= original_size:
-        # 复制原文件作为输出
+        # Copy original as output
         shutil.copy2(input_path, output_path)
         compressed_size = original_size
-        logger.warning(f"压缩后文件变大 ({original_size} -> {compressed_size})，返回原文件")
+        logger.warning(f"Compressed file larger ({original_size} -> {compressed_size}), returning original")
         return {
             "success": True,
             "original_size": original_size,
             "compressed_size": compressed_size,
             "ratio": 0.0,
-            "warning": "该文件已高度优化，无法进一步压缩"
+            "warning": "File already highly optimized, cannot compress further"
         }
 
     ratio = (1 - compressed_size / original_size) * 100
 
     if progress_callback:
-        progress_callback(100, "压缩完成！")
+        progress_callback(100, "Compression complete!")
 
     return {
         "success": True,

@@ -1,21 +1,21 @@
 """
-PDF 压缩工具 - 全局配置
+PDF Compressor - Global Configuration
 
-支持开发环境和 PyInstaller 打包环境。
+Supports both development and PyInstaller frozen environments.
 """
 import os
 import sys
 import platform
 
-# ========== 路径检测 ==========
+# ========== Path Detection ==========
 
 def is_frozen() -> bool:
-    """是否运行在 PyInstaller 打包环境"""
+    """Check if running in PyInstaller frozen environment"""
     return getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS")
 
 
 def get_app_dir() -> str:
-    """获取应用数据目录（用于存放上传/输出文件，必须可写）"""
+    """Get application data directory (for uploads/outputs, must be writable)"""
     if is_frozen():
         system = platform.system()
         if system == "Windows":
@@ -32,42 +32,42 @@ def get_app_dir() -> str:
 
 
 def get_resource_dir() -> str:
-    """获取资源目录（模板/静态文件/Ghostscript，只读）"""
+    """Get resource directory (templates/static/Ghostscript, read-only)"""
     if is_frozen():
         return sys._MEIPASS
     return os.path.dirname(os.path.abspath(__file__))
 
 
-# ========== 基础路径 ==========
+# ========== Base Paths ==========
 
 APP_DIR = get_app_dir()
 RESOURCE_DIR = get_resource_dir()
 
-# 服务器配置
+# Server config
 HOST = "127.0.0.1"
 PORT = 5000
 DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
-# 上传配置
+# Upload config
 MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB
 ALLOWED_EXTENSIONS = {"pdf"}
 UPLOAD_FOLDER = os.path.join(APP_DIR, "uploads")
 OUTPUT_FOLDER = os.path.join(APP_DIR, "outputs")
 
-# 文件自动清理时间（秒）
-FILE_CLEANUP_SECONDS = 10 * 60  # 10 分钟
+# Auto cleanup interval (seconds)
+FILE_CLEANUP_SECONDS = 10 * 60  # 10 minutes
 
-# 压缩超时（秒）
-COMPRESS_TIMEOUT = 5 * 60  # 5 分钟
+# Compression timeout (seconds)
+COMPRESS_TIMEOUT = 5 * 60  # 5 minutes
 
-# ========== Ghostscript 路径 ==========
+# ========== Ghostscript Paths ==========
 
 def _build_gs_paths() -> list:
-    """构建 Ghostscript 搜索路径列表"""
+    """Build Ghostscript executable search paths"""
     paths = []
 
     if is_frozen():
-        # 打包模式：优先查找内嵌的 Ghostscript
+        # Frozen mode: prefer bundled Ghostscript
         vendor_dir = os.path.join(RESOURCE_DIR, "vendor", "ghostscript")
         system = platform.system()
 
@@ -75,19 +75,19 @@ def _build_gs_paths() -> list:
             # macOS: Universal Binary
             paths.append(os.path.join(vendor_dir, "gs"))
         elif system == "Windows":
-            # Windows: 根据架构选择
+            # Windows: select by architecture
             machine = platform.machine().lower()
             if machine in ("arm64", "aarch64"):
                 paths.append(os.path.join(vendor_dir, "arm64", "gswin64c.exe"))
             paths.append(os.path.join(vendor_dir, "x64", "gswin64c.exe"))
             paths.append(os.path.join(vendor_dir, "gswin64c.exe"))
 
-    # 开发模式或 fallback：vendor 目录 + 系统 PATH
+    # Development mode or fallback: vendor dir + system PATH
     paths.extend([
         os.path.join(RESOURCE_DIR, "vendor", "ghostscript", "mac", "gs"),
         os.path.join(RESOURCE_DIR, "vendor", "ghostscript", "windows", "gswin64c.exe"),
-        "gs",           # macOS/Linux 系统 PATH
-        "gswin64c",     # Windows 系统 PATH
+        "gs",           # macOS/Linux system PATH
+        "gswin64c",     # Windows system PATH
         "gswin32c",     # Windows 32-bit
     ])
 
@@ -96,7 +96,7 @@ def _build_gs_paths() -> list:
 
 GS_PATHS = _build_gs_paths()
 
-# ========== 确保目录存在 ==========
+# ========== Ensure Directories Exist ==========
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)

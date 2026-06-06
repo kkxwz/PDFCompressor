@@ -1,11 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PDF Compressor - PyInstaller 打包配置
+PDF Compressor - PyInstaller Build Configuration
 
-用法：
+Usage:
     pyinstaller build.spec
 
-或分平台使用构建脚本：
+Or use platform-specific build scripts:
     macOS:   bash scripts/build_mac.sh
     Windows: scripts\build_windows.bat
 """
@@ -15,33 +15,33 @@ import platform
 
 block_cipher = None
 
-# 项目根目录（SPECPATH 是 PyInstaller 内置变量，指向 spec 文件所在目录）
+# Project root directory (SPECPATH is a PyInstaller built-in variable pointing to spec file dir)
 PROJECT_DIR = SPECPATH
 
-# ========== 数据文件 ==========
+# ========== Data Files ==========
 datas = [
     (os.path.join(PROJECT_DIR, 'templates'), 'templates'),
     (os.path.join(PROJECT_DIR, 'static'), 'static'),
 ]
 
-# ========== Ghostscript 二进制 ==========
+# ========== Ghostscript Binaries ==========
 binaries = []
 
 system = platform.system()
 vendor_dir = os.path.join(PROJECT_DIR, 'vendor', 'ghostscript')
 
 if system == 'Darwin':
-    # macOS: 查找 gs 二进制
+    # macOS: find gs binary
     gs_path = os.path.join(vendor_dir, 'gs')
     if not os.path.isfile(gs_path):
-        # 尝试从 Homebrew 获取
+        # Try to get from Homebrew
         import shutil
         gs_path = shutil.which('gs')
     if gs_path and os.path.isfile(gs_path):
         binaries.append((gs_path, 'vendor/ghostscript'))
-        # 收集 gs 依赖的动态库
+        # Collect gs dependent dynamic libraries
         gs_dir = os.path.dirname(gs_path)
-        # 查找 Ghostscript 的 Resource 目录
+        # Find Ghostscript Resource directory
         for search_dir in [
             os.path.join(gs_dir, '..', 'share', 'ghostscript'),
             os.path.join(gs_dir, '..', 'lib', 'ghostscript'),
@@ -49,7 +49,7 @@ if system == 'Darwin':
             '/usr/local/share/ghostscript',
         ]:
             if os.path.isdir(search_dir):
-                # 查找最新版本的 Resource 目录
+                # Find latest version Resource directory
                 for item in os.listdir(search_dir):
                     resource_dir = os.path.join(search_dir, item, 'Resource')
                     if os.path.isdir(resource_dir):
@@ -59,22 +59,22 @@ if system == 'Darwin':
                 break
 
 elif system == 'Windows':
-    # Windows: 收集 Ghostscript 文件
+    # Windows: collect Ghostscript files
     machine = platform.machine().lower()
 
-    # 优先使用 vendor 目录
+    # Prefer vendor directory
     for sub_dir in ['arm64', 'x64', '']:
         gs_dir = os.path.join(vendor_dir, sub_dir) if sub_dir else vendor_dir
         gs_exe = os.path.join(gs_dir, 'gswin64c.exe')
         if os.path.isfile(gs_exe):
             binaries.append((gs_exe,
                              os.path.join('vendor', 'ghostscript', sub_dir) if sub_dir else 'vendor/ghostscript'))
-            # 收集 DLL 文件
+            # Collect DLL files
             for f in os.listdir(gs_dir):
                 if f.endswith('.dll'):
                     binaries.append((os.path.join(gs_dir, f),
                                      os.path.join('vendor', 'ghostscript', sub_dir) if sub_dir else 'vendor/ghostscript'))
-            # 收集 lib 目录（Ghostscript 资源文件）
+            # Collect lib directory (Ghostscript resource files)
             lib_dir = os.path.join(gs_dir, 'lib')
             if os.path.isdir(lib_dir):
                 datas.append((lib_dir,
@@ -82,7 +82,7 @@ elif system == 'Windows':
                               else os.path.join('vendor', 'ghostscript', 'lib')))
             break
 
-# ========== 构建配置 ==========
+# ========== Build Configuration ==========
 a = Analysis(
     [os.path.join(PROJECT_DIR, 'app.py')],
     pathex=[PROJECT_DIR],
@@ -108,13 +108,13 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# ========== 可执行文件 ==========
+# ========== Executable ==========
 exe_options = dict(
     pyz=pyz,
     scripts=a.scripts,
     strip=False,
     upx=True,
-    console=True,         # 保留控制台窗口（用于日志输出）
+    console=True,         # Keep console window for log output
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -123,9 +123,9 @@ exe_options = dict(
 )
 
 if system == 'Darwin':
-    # macOS: 生成 .app bundle
+    # macOS: generate .app bundle
     exe_options['name'] = 'PDFCompressor'
-    exe_options['exclude_binaries'] = True  # macOS COLLECT 需要
+    exe_options['exclude_binaries'] = True  # macOS COLLECT requires this
     exe = EXE(**exe_options)
     coll = COLLECT(
         exe,
@@ -140,7 +140,7 @@ if system == 'Darwin':
     app = BUNDLE(
         coll,
         name='PDF Compressor.app',
-        icon=None,  # 可设置 .icns 图标文件路径
+        icon=None,  # Can set .icns icon file path here
         bundle_identifier='com.tools.pdfcompressor',
         info_plist={
             'NSHighResolutionCapable': True,
@@ -152,9 +152,9 @@ if system == 'Darwin':
     )
 
 else:
-    # Windows/Linux: 生成单文件 exe
+    # Windows/Linux: generate single-file exe
     exe_options['name'] = 'PDFCompressor'
-    exe_options['icon'] = None  # 可设置 .ico 图标文件路径
+    exe_options['icon'] = None  # Can set .ico icon file path here
     exe_options['binaries'] = a.binaries
     exe_options['zipfiles'] = a.zipfiles
     exe_options['datas'] = a.datas

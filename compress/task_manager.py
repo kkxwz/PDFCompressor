@@ -1,11 +1,11 @@
 """
-任务管理器 - 管理压缩任务的生命周期
+Task Manager - Manages compression task lifecycle
 
-支持：
-- 异步执行压缩任务
-- 进度追踪
-- 任务状态查询
-- 临时文件自动清理
+Supports:
+- Async compression task execution
+- Progress tracking
+- Task status query
+- Auto temp file cleanup
 """
 import os
 import uuid
@@ -29,7 +29,7 @@ class TaskStatus:
 
 
 class Task:
-    """压缩任务"""
+    """Compression task"""
 
     def __init__(self, task_id: str, file_id: str, input_path: str,
                  output_path: str, level: str, original_filename: str):
@@ -49,12 +49,12 @@ class Task:
         self.created_at = time.time()
 
     def update_progress(self, progress: int, message: str):
-        """更新进度（线程安全）"""
+        """Update progress (thread-safe)"""
         self.progress = progress
         self.stage_message = message
 
     def to_dict(self) -> dict:
-        """转换为字典"""
+        """Convert to dict"""
         data = {
             "task_id": self.task_id,
             "status": self.status,
@@ -69,20 +69,20 @@ class Task:
 
 
 class TaskManager:
-    """任务管理器"""
+    """Task manager"""
 
     def __init__(self, max_workers: int = 4):
         self.tasks: dict[str, Task] = {}
         self.lock = threading.Lock()
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
 
-        # 启动清理线程
+        # Start cleanup thread
         cleanup_thread = threading.Thread(target=self._cleanup_loop, daemon=True)
         cleanup_thread.start()
 
     def create_task(self, file_id: str, input_path: str, level: str,
                     original_filename: str) -> Task:
-        """创建压缩任务"""
+        """Create compression task"""
         task_id = str(uuid.uuid4())
         output_filename = f"{task_id}_compressed.pdf"
         output_path = os.path.join(config.OUTPUT_FOLDER, output_filename)
@@ -102,7 +102,7 @@ class TaskManager:
         return task
 
     def start_task(self, task: Task):
-        """异步启动压缩任务"""
+        """Async start compression task"""
         task.status = TaskStatus.PROCESSING
 
         def run_compression():
@@ -117,7 +117,7 @@ class TaskManager:
                 if result["success"]:
                     task.status = TaskStatus.DONE
                     task.progress = 100
-                    task.stage_message = "压缩完成！"
+                    task.stage_message = "Compression complete!"
                     task.result = {
                         "original_size": result["original_size"],
                         "compressed_size": result["compressed_size"],
@@ -128,29 +128,29 @@ class TaskManager:
                         task.result["warning"] = result["warning"]
                 else:
                     task.status = TaskStatus.ERROR
-                    task.error = result.get("error", "压缩失败")
-                    logger.error(f"任务 {task.task_id} 失败: {task.error}")
+                    task.error = result.get("error", "Compression failed")
+                    logger.error(f"Task {task.task_id} failed: {task.error}")
 
             except Exception as e:
                 task.status = TaskStatus.ERROR
                 task.error = str(e)
-                logger.exception(f"任务 {task.task_id} 异常")
+                logger.exception(f"Task {task.task_id} exception")
 
         self.executor.submit(run_compression)
 
     def get_task(self, task_id: str) -> Optional[Task]:
-        """获取任务"""
+        """Get task"""
         with self.lock:
             return self.tasks.get(task_id)
 
     def _cleanup_loop(self):
-        """定期清理过期任务和文件"""
+        """Periodic cleanup of expired tasks and files"""
         while True:
-            time.sleep(60)  # 每分钟检查一次
+            time.sleep(60)  # Check every minute
             self._cleanup_expired()
 
     def _cleanup_expired(self):
-        """清理过期任务"""
+        """Clean up expired tasks"""
         current_time = time.time()
         tasks_to_remove = []
 
@@ -163,24 +163,24 @@ class TaskManager:
             for task_id in tasks_to_remove:
                 task = self.tasks.pop(task_id, None)
                 if task:
-                    # 清理输出文件
+                    # Clean up output file
                     if os.path.isfile(task.output_path):
                         try:
                             os.remove(task.output_path)
-                            logger.info(f"已清理输出文件: {task.output_path}")
+                            logger.info(f"Cleaned up output file: {task.output_path}")
                         except Exception as e:
-                            logger.warning(f"清理输出文件失败: {e}")
+                            logger.warning(f"Failed to clean up output file: {e}")
 
         if tasks_to_remove:
-            logger.info(f"已清理 {len(tasks_to_remove)} 个过期任务")
+            logger.info(f"Cleaned up {len(tasks_to_remove)} expired tasks")
 
 
-# 全局任务管理器实例
+# Global task manager instance
 _task_manager: Optional[TaskManager] = None
 
 
 def get_task_manager() -> TaskManager:
-    """获取全局任务管理器"""
+    """Get global task manager"""
     global _task_manager
     if _task_manager is None:
         _task_manager = TaskManager()

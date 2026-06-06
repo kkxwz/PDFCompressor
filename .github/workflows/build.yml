@@ -3,40 +3,40 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'  # 推送 v1.0.0 等标签时触发
-  workflow_dispatch:  # 支持手动触发
+      - 'v*'  # Trigger on v1.0.0 etc. tags
+  workflow_dispatch:  # Support manual trigger
 
 permissions:
   contents: write
 
 jobs:
   # ============================================
-  # macOS 构建（Intel + Apple Silicon 通用）
+  # macOS Build (Intel + Apple Silicon Universal)
   # ============================================
   build-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装 Python 依赖
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: 安装 Ghostscript
+      - name: Install Ghostscript
         run: |
           brew install ghostscript
           echo "GS_PATH=$(which gs)" >> $GITHUB_ENV
 
-      - name: 准备 Ghostscript 二进制
+      - name: Prepare Ghostscript binary
         run: |
-          echo "项目根目录: $(pwd)"
-          echo "文件列表:"
+          echo "Project root: $(pwd)"
+          echo "File list:"
           ls -la
           mkdir -p vendor/ghostscript
           cp "$GS_PATH" vendor/ghostscript/gs
           chmod +x vendor/ghostscript/gs
-          # 收集 Resource 文件
+          # Collect Resource files
           GS_SHARE=$(dirname $(dirname "$GS_PATH"))/share/ghostscript
           if [ -d "$GS_SHARE" ]; then
             GS_VER=$(ls "$GS_SHARE" | head -1)
@@ -47,10 +47,10 @@ jobs:
           fi
           echo "Ghostscript version: $($GS_PATH --version)"
 
-      - name: PyInstaller 构建
+      - name: PyInstaller Build
         run: pyinstaller build.spec --clean --noconfirm
 
-      - name: 创建 DMG
+      - name: Create DMG
         run: |
           if [ -d "dist/PDF Compressor.app" ]; then
             hdiutil create -volname "PDF Compressor" \
@@ -59,7 +59,7 @@ jobs:
               dist/PDFCompressor-macOS.dmg
           fi
 
-      - name: 上传产物
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PDFCompressor-macOS
@@ -68,28 +68,28 @@ jobs:
             dist/PDF Compressor.app
 
   # ============================================
-  # Windows x64 构建
+  # Windows x64 Build
   # ============================================
   build-windows-x64:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: 安装 Python 依赖
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: 安装 Ghostscript
+      - name: Install Ghostscript
         shell: pwsh
         run: |
-          # 下载 Ghostscript Windows x64
+          # Download Ghostscript Windows x64
           $gsUrl = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/ghostscript-10.04.0-win64.zip"
-          # 尝试使用 chocolatey 安装
+          # Try chocolatey install
           choco install ghostscript --no-progress -y
           $gsPath = (Get-Command gswin64c -ErrorAction SilentlyContinue).Source
           if (-not $gsPath) {
-            # 查找常见安装路径
+            # Search common install paths
             $searchPaths = @(
               "C:\Program Files\gs\*\bin\gswin64c.exe",
               "C:\Program Files (x86)\gs\*\bin\gswin64c.exe"
@@ -114,39 +114,39 @@ jobs:
             Write-Host "WARNING: Ghostscript not found, build may fail"
           }
 
-      - name: PyInstaller 构建
+      - name: PyInstaller Build
         run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
 
-      - name: 上传产物
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PDFCompressor-Windows-x64
           path: dist/PDFCompressor.exe
 
   # ============================================
-  # Windows ARM64 构建
+  # Windows ARM64 Build
   # ============================================
   build-windows-arm64:
     runs-on: windows-11-arm  # GitHub Actions Windows ARM runner
     steps:
       - uses: actions/checkout@v4
 
-      - name: 设置 Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: 安装 Python 依赖
+      - name: Install Python dependencies
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
 
-      - name: 安装 Ghostscript ARM64
+      - name: Install Ghostscript ARM64
         shell: pwsh
         run: |
-          # 下载 Ghostscript Windows ARM64 (如果可用)
-          # 目前 Ghostscript 官方尚未提供独立的 ARM64 版本
-          # ARM64 Windows 可通过 x64 模拟运行 gswin64c.exe
+          # Download Ghostscript Windows ARM64 (if available)
+          # Ghostscript official does not yet provide standalone ARM64 builds
+          # ARM64 Windows can run gswin64c.exe via x64 emulation
           $gsUrl = "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10040/ghostscript-10.04.0-win64.zip"
           $gsZip = "$env:TEMP\gs.zip"
           $gsExtract = "$env:TEMP\gs_extract"
@@ -171,29 +171,29 @@ jobs:
             Write-Host "Falling back to system Ghostscript if available"
           }
 
-      - name: PyInstaller 构建
+      - name: PyInstaller Build
         run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
 
-      - name: 上传产物
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PDFCompressor-Windows-ARM64
           path: dist/PDFCompressor.exe
 
   # ============================================
-  # 发布 Release
+  # Release
   # ============================================
   release:
     needs: [build-macos, build-windows-x64, build-windows-arm64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: 下载所有产物
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: 创建 Release
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
