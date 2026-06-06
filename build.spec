@@ -16,7 +16,7 @@ import platform
 block_cipher = None
 
 # 项目根目录
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_DIR = os.path.dirname(os.path.abspath(SPECPATH))
 
 # ========== 数据文件 ==========
 datas = [
