@@ -45,7 +45,7 @@ jobs:
           echo "Ghostscript version: $($GS_PATH --version)"
 
       - name: PyInstaller 构建
-        run: pyinstaller build.spec --clean --noconfirm
+        run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
 
       - name: 创建 DMG
         run: |
@@ -112,7 +112,7 @@ jobs:
           }
 
       - name: PyInstaller 构建
-        run: pyinstaller build.spec --clean --noconfirm
+        run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
 
       - name: 上传产物
         uses: actions/upload-artifact@v4
@@ -169,7 +169,7 @@ jobs:
           }
 
       - name: PyInstaller 构建
-        run: pyinstaller build.spec --clean --noconfirm
+        run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
 
       - name: 上传产物
         uses: actions/upload-artifact@v4
