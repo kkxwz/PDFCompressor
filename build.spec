@@ -15,8 +15,8 @@ import platform
 
 block_cipher = None
 
-# 项目根目录
-PROJECT_DIR = os.getcwd()
+# 项目根目录（SPECPATH 是 PyInstaller 内置变量，指向 spec 文件所在目录）
+PROJECT_DIR = SPECPATH
 
 # ========== 数据文件 ==========
 datas = [

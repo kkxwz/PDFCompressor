@@ -30,6 +30,9 @@ jobs:
 
       - name: 准备 Ghostscript 二进制
         run: |
+          echo "项目根目录: $(pwd)"
+          echo "文件列表:"
+          ls -la
           mkdir -p vendor/ghostscript
           cp "$GS_PATH" vendor/ghostscript/gs
           chmod +x vendor/ghostscript/gs
@@ -45,7 +48,7 @@ jobs:
           echo "Ghostscript version: $($GS_PATH --version)"
 
       - name: PyInstaller 构建
-        run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
+        run: pyinstaller build.spec --clean --noconfirm
 
       - name: 创建 DMG
         run: |
