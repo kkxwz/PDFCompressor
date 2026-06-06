@@ -55,7 +55,7 @@ UPLOAD_FOLDER = os.path.join(APP_DIR, "uploads")
 OUTPUT_FOLDER = os.path.join(APP_DIR, "outputs")
 
 # Auto cleanup interval (seconds)
-FILE_CLEANUP_SECONDS = 10 * 60  # 10 minutes
+FILE_CLEANUP_SECONDS = 5 * 60  # 5 minutes
 
 # Compression timeout (seconds)
 COMPRESS_TIMEOUT = 5 * 60  # 5 minutes
@@ -97,6 +97,4 @@ def _build_gs_paths() -> list:
 GS_PATHS = _build_gs_paths()
 
 # ========== Ensure Directories Exist ==========
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+# Note: Directory creation moved to app.py create_app() to avoid side effects on import

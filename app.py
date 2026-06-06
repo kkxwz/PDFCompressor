@@ -30,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> Flask:
     """Create Flask application"""
+    # Ensure required directories exist
+    os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(config.OUTPUT_FOLDER, exist_ok=True)
+
     resource_dir = config.RESOURCE_DIR
     template_folder = os.path.join(resource_dir, "templates")
     static_folder = os.path.join(resource_dir, "static")

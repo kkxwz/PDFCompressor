@@ -1,0 +1,41 @@
+{
+  "app": {
+    "title": "PDF Compressor",
+    "uploading": "Uploading...",
+    "startCompression": "Start Compression",
+    "compressing": "Compressing...",
+    "compressionComplete": "Compression Complete!",
+    "download": "Download Compressed File",
+    "restart": "Compress Another File",
+    "retry": "Re-upload",
+    "dragDrop": "Drag PDF file here",
+    "clickSelect": "Click to select file",
+    "maxSize": "Max 100MB",
+    "fileType": "Only PDF format supported"
+  },
+  "errors": {
+    "noFile": "No file selected",
+    "onlyPdf": "Only PDF format files are supported",
+    "fileTooLarge": "File too large, max supported 100MB",
+    "uploadFailed": "File upload failed, please try again",
+    "missingFileId": "Please upload a file first",
+    "startCompressionFailed": "Failed to start compression, please try again",
+    "compressionFailed": "Compression failed",
+    "ghostscriptNotFound": "Ghostscript not installed. Compression is unavailable.",
+    "connectionInterrupted": "Connection interrupted. Please refresh the page and try again.",
+    "serverUnreachable": "Server unreachable. Please check if the application is running."
+  },
+  "progress": {
+    "analyzing": "Analyzing PDF file...",
+    "starting": "Starting compression engine...",
+    "processing": "Processing...",
+    "page": "Compressing page {current}/{total}..."
+  },
+  "result": {
+    "originalSize": "Original Size",
+    "compressedSize": "Compressed Size",
+    "saved": "Saved",
+    "warning": "File already highly optimized, cannot compress further",
+    "cleanupNote": "Compressed files will be auto-cleaned after 5 minutes"
+  }
+}

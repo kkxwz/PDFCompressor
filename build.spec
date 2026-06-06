@@ -91,7 +91,6 @@ a = Analysis(
     hiddenimports=[
         'flask',
         'werkzeug',
-        'engineio.async_drivers.threading',
     ],
     hookspath=[],
     hooksconfig={},

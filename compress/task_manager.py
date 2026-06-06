@@ -114,6 +114,14 @@ class TaskManager:
                     progress_callback=task.update_progress
                 )
 
+                # Clean up uploaded input file after compression
+                try:
+                    if os.path.isfile(task.input_path):
+                        os.remove(task.input_path)
+                        logger.info(f"Cleaned up uploaded file: {task.input_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to clean up uploaded file: {e}")
+
                 if result["success"]:
                     task.status = TaskStatus.DONE
                     task.progress = 100
@@ -177,11 +185,14 @@ class TaskManager:
 
 # Global task manager instance
 _task_manager: Optional[TaskManager] = None
+_task_manager_lock = threading.Lock()
 
 
 def get_task_manager() -> TaskManager:
-    """Get global task manager"""
+    """Get global task manager (thread-safe singleton)"""
     global _task_manager
     if _task_manager is None:
-        _task_manager = TaskManager()
+        with _task_manager_lock:
+            if _task_manager is None:  # Double-checked locking
+                _task_manager = TaskManager()
     return _task_manager

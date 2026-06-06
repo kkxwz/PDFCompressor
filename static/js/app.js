@@ -1,10 +1,10 @@
 /**
- * PDF Compressor - 前端交互逻辑
+ * PDF Compressor - Frontend Interaction Logic
  */
 (function() {
     'use strict';
 
-    // ========== 主题换肤 ==========
+    // ========== Theme Switching ==========
     const THEME_KEY = 'pdf-compressor-theme';
     const themeToggle = document.getElementById('themeToggle');
 
@@ -42,7 +42,7 @@
         applyTheme(btn.dataset.themeValue);
     });
 
-    // DOM 元素
+    // DOM Elements
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const fileInfo = document.getElementById('fileInfo');
@@ -69,18 +69,18 @@
     const errorMessage = document.getElementById('errorMessage');
     const btnRetry = document.getElementById('btnRetry');
 
-    // 所有可切换区域
+    // All switchable sections
     const allSections = [optionsSection, progressSection, resultSection, errorSection];
 
-    // 状态
+    // State
     let currentFile = null;
     let currentFileId = null;
 
-    // 圆环进度参数
+    // Ring progress params
     const RING_RADIUS = 52;
     const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
-    // ========== 工具函数 ==========
+    // ========== Utility Functions ==========
 
     function formatSize(bytes) {
         if (bytes < 1024) return bytes + ' B';
@@ -120,7 +120,7 @@
         progressRing.style.strokeDashoffset = offset;
     }
 
-    // ========== 拖拽上传 ==========
+    // ========== Drag & Drop Upload ==========
 
     dropZone.addEventListener('click', () => fileInput.click());
 
@@ -144,17 +144,18 @@
         if (e.target.files.length > 0) handleFile(e.target.files[0]);
     });
 
-    // ========== 文件处理 ==========
+    // ========== File Handling ==========
 
     function handleFile(file) {
-        if (!file.name.toLowerCase().endsWith('.pdf')) {
-            showError('仅支持 PDF 格式文件，请选择 .pdf 文件');
+        // Check MIME type first, then fallback to extension
+        if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+            showError('Only PDF format files are supported. Please select a .pdf file.');
             return;
         }
 
         const maxSize = 100 * 1024 * 1024;
         if (file.size > maxSize) {
-            showError(`文件过大（${formatSize(file.size)}），最大支持 100MB`);
+            showError(`File too large (${formatSize(file.size)}), max supported 100MB`);
             return;
         }
 
@@ -168,7 +169,7 @@
         fileName.textContent = file.name;
         fileSize.textContent = formatSize(file.size);
         btnCompress.disabled = true;
-        btnCompress.innerHTML = '<span>上传中...</span>';
+        btnCompress.innerHTML = '<span>Uploading...</span>';
 
         const formData = new FormData();
         formData.append('file', file);
@@ -182,7 +183,7 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || '上传失败');
+                throw new Error(data.message || 'Upload failed');
             }
 
             currentFileId = data.file_id;
@@ -196,13 +197,13 @@
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M3 10l4 4L17 4" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>开始压缩</span>
+                <span>Start Compression</span>
                 <div class="btn-shimmer"></div>
             `;
 
         } catch (error) {
-            console.error('上传失败:', error);
-            showError(error.message || '文件上传失败，请重试');
+            console.error('Upload failed:', error);
+            showError(error.message || 'File upload failed, please try again');
             resetUpload();
         }
     }
@@ -217,18 +218,18 @@
         updateSteps(1);
     }
 
-    // ========== 移除文件 ==========
+    // ========== Remove File ==========
     btnRemove.addEventListener('click', (e) => {
         e.stopPropagation();
         resetUpload();
     });
 
-    // ========== 开始压缩 ==========
+    // ========== Start Compression ==========
     btnCompress.addEventListener('click', startCompression);
 
     async function startCompression() {
         if (!currentFileId) {
-            showError('请先上传文件');
+            showError('Please upload a file first');
             return;
         }
 
@@ -238,8 +239,8 @@
         progressFill.style.width = '0%';
         progressPercent.textContent = '0';
         setRingProgress(0);
-        progressMessage.textContent = '正在启动压缩引擎...';
-        progressTitle.textContent = '正在压缩...';
+        progressMessage.textContent = 'Starting compression engine...';
+        progressTitle.textContent = 'Compressing...';
 
         try {
             const response = await fetch('/api/compress', {
@@ -254,18 +255,18 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || '启动压缩失败');
+                throw new Error(data.message || 'Failed to start compression');
             }
 
             listenProgress(data.task_id);
 
         } catch (error) {
-            console.error('启动压缩失败:', error);
-            showError(error.message || '启动压缩失败，请重试');
+            console.error('Failed to start compression:', error);
+            showError(error.message || 'Failed to start compression, please try again');
         }
     }
 
-    // ========== 进度监听 ==========
+    // ========== Progress Listener ==========
 
     function listenProgress(taskId) {
         const eventSource = new EventSource(`/api/progress/${taskId}`);
@@ -277,7 +278,7 @@
             progressFill.style.width = `${progress}%`;
             progressPercent.textContent = progress;
             setRingProgress(progress);
-            progressMessage.textContent = data.message || '处理中...';
+            progressMessage.textContent = data.message || 'Processing...';
 
             if (data.stage === 'done') {
                 eventSource.close();
@@ -285,25 +286,40 @@
                 showResult(data.result);
             } else if (data.stage === 'error') {
                 eventSource.close();
-                showError(data.error || '压缩失败');
+                showError(data.error || 'Compression failed');
             }
         };
 
         eventSource.onerror = () => {
             eventSource.close();
+            // SSE connection lost, try to check task status via REST API
             setTimeout(() => {
-                fetch(`/api/progress/${taskId}`)
-                    .then(res => {
-                        if (res.ok) listenProgress(taskId);
+                fetch(`/api/health`)
+                    .then(() => {
+                        // Server is alive, task may have completed while reconnecting
+                        // Try to fetch task result directly
+                        fetch(`/api/download/${taskId}`, { method: 'HEAD' })
+                            .then(res => {
+                                if (res.ok || res.status === 200) {
+                                    // Task completed, redirect to download
+                                    window.location.href = `/api/download/${taskId}`;
+                                } else {
+                                    // Task still processing or failed, retry SSE
+                                    listenProgress(taskId);
+                                }
+                            })
+                            .catch(() => {
+                                showError('Connection interrupted. Please refresh the page and try again.');
+                            });
                     })
                     .catch(() => {
-                        showError('连接中断，请刷新页面重试');
+                        showError('Server unreachable. Please check if the application is running.');
                     });
             }, 1000);
         };
     }
 
-    // ========== 显示结果 ==========
+    // ========== Show Result ==========
 
     function showResult(result) {
         showSection(resultSection);
@@ -322,18 +338,18 @@
         }
     }
 
-    // ========== 重新开始 ==========
+    // ========== Restart ==========
     btnRestart.addEventListener('click', resetUpload);
     btnRetry.addEventListener('click', resetUpload);
 
-    // ========== 初始化 ==========
+    // ========== Initialization ==========
     updateSteps(1);
 
     fetch('/api/health')
         .then(res => res.json())
         .then(data => {
             if (!data.ghostscript.available) {
-                showError('Ghostscript 未安装，压缩功能不可用。请先安装 Ghostscript。');
+                showError('Ghostscript not installed. Compression is unavailable. Please install Ghostscript first.');
             }
         })
         .catch(() => {});
