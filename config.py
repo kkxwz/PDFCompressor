@@ -46,7 +46,7 @@ RESOURCE_DIR = get_resource_dir()
 # 服务器配置
 HOST = "127.0.0.1"
 PORT = 5000
-DEBUG = not is_frozen()  # 打包后关闭调试模式
+DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
 # 上传配置
 MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB

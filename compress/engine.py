@@ -44,6 +44,19 @@ def get_gs_version(gs_path: str) -> Optional[str]:
         return None
 
 
+def _validate_pdf_path(path: str) -> bool:
+    """确保路径是安全的 PDF 文件路径"""
+    if not os.path.isfile(path):
+        return False
+    if not path.lower().endswith('.pdf'):
+        return False
+    # 禁止路径遍历：确保解析后的路径在允许的目录内
+    real_path = os.path.realpath(path)
+    upload_dir = os.path.realpath(config.UPLOAD_FOLDER)
+    output_dir = os.path.realpath(config.OUTPUT_FOLDER)
+    return real_path.startswith(upload_dir) or real_path.startswith(output_dir)
+
+
 def _build_gs_command(gs_path: str, input_path: str, output_path: str,
                       profile: dict) -> list:
     """
@@ -232,6 +245,20 @@ def compress_pdf(
         return {
             "success": False,
             "error": f"输入文件不存在: {input_path}"
+        }
+
+    # 校验文件路径安全性（防止路径遍历和参数注入）
+    if not _validate_pdf_path(input_path):
+        return {
+            "success": False,
+            "error": "无效的文件路径"
+        }
+
+    # 校验输出路径安全性
+    if not _validate_pdf_path(output_path):
+        return {
+            "success": False,
+            "error": "无效的输出路径"
         }
 
     original_size = os.path.getsize(input_path)
