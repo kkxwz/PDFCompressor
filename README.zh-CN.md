@@ -1,7 +1,7 @@
-# PDF Compressor
+# SlimPDF
 
 <p align="center">
-  <img src="static/images/logo.svg" width="80" alt="PDF Compressor Logo">
+  <img src="static/images/logo.svg" width="80" alt="SlimPDF Logo">
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 ## 📸 预览
 
 <p align="center">
-  <img src="docs/images/screenshot.png" width="720" alt="PDF Compressor Screenshot">
+  <img src="docs/images/screenshot.png" width="720" alt="SlimPDF Screenshot">
 </p>
 
 > 拖拽文件 → 选择压缩级别 → 3 秒完成 → 下载结果
@@ -81,8 +81,8 @@
 
 | 平台 | 下载 | 说明 |
 |------|------|------|
-| macOS | `PDFCompressor-macOS.dmg` | Universal Binary (Intel + Apple Silicon) |
-| Windows | `PDFCompressor-Windows-x64.exe` | 64-bit Windows 10/11 |
+| macOS | `SlimPDF-macOS.dmg` | Universal Binary (Intel + Apple Silicon) |
+| Windows | `SlimPDF-Windows-x64.exe` | 64-bit Windows 10/11 |
 
 ### 系统要求
 

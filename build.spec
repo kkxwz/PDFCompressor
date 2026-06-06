@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PDF Compressor - PyInstaller Build Configuration
+SlimPDF - PyInstaller Build Configuration
 
 Usage:
     pyinstaller build.spec
@@ -123,7 +123,7 @@ exe_options = dict(
 
 if system == 'Darwin':
     # macOS: generate .app bundle
-    exe_options['name'] = 'PDFCompressor'
+    exe_options['name'] = 'SlimPDF'
     exe_options['exclude_binaries'] = True  # macOS COLLECT requires this
     exe = EXE(**exe_options)
     coll = COLLECT(
@@ -134,25 +134,25 @@ if system == 'Darwin':
         strip=False,
         upx=True,
         upx_exclude=[],
-        name='PDFCompressor',
+        name='SlimPDF',
     )
     app = BUNDLE(
         coll,
-        name='PDF Compressor.app',
+        name='SlimPDF.app',
         icon=None,  # Can set .icns icon file path here
         bundle_identifier='com.tools.pdfcompressor',
         info_plist={
             'NSHighResolutionCapable': True,
             'CFBundleShortVersionString': '1.0.0',
             'CFBundleVersion': '1',
-            'NSHumanReadableCopyright': 'PDF Compressor',
-            'CFBundleDisplayName': 'PDF Compressor',
+            'NSHumanReadableCopyright': 'SlimPDF',
+            'CFBundleDisplayName': 'SlimPDF',
         },
     )
 
 else:
     # Windows/Linux: generate single-file exe
-    exe_options['name'] = 'PDFCompressor'
+    exe_options['name'] = 'SlimPDF'
     exe_options['icon'] = None  # Can set .ico icon file path here
     exe_options['binaries'] = a.binaries
     exe_options['zipfiles'] = a.zipfiles

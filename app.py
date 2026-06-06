@@ -1,5 +1,5 @@
 """
-PDF Compressor - Flask Main Application
+SlimPDF - Flask Main Application
 
 Start:
     python app.py
@@ -84,7 +84,7 @@ def cleanup_temp_files():
 
 if __name__ == "__main__":
     logger.info("=" * 50)
-    logger.info("PDF Compressor starting...")
+    logger.info("SlimPDF starting...")
     logger.info(f"Visit: http://{config.HOST}:{config.PORT}")
     logger.info(f"App data: {config.APP_DIR}")
     logger.info(f"Resource dir: {config.RESOURCE_DIR}")
@@ -107,7 +107,7 @@ if __name__ == "__main__":
     if not config.DEBUG:
         threading.Timer(1.5, open_browser).start()
         print(f"\n{'=' * 50}")
-        print(f"  PDF Compressor started")
+        print(f"  SlimPDF started")
         print(f"  Browser will auto-open. If not, visit:")
         print(f"  http://{config.HOST}:{config.PORT}")
         print(f"  Press Ctrl+C to exit")

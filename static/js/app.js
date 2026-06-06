@@ -1,5 +1,5 @@
 /**
- * PDF Compressor - Frontend Interaction Logic
+ * SlimPDF - Frontend Interaction Logic
  */
 (function() {
     'use strict';

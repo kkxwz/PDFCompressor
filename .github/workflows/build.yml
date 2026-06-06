@@ -55,20 +55,20 @@ jobs:
 
       - name: Create DMG
         run: |
-          if [ -d "dist/PDF Compressor.app" ]; then
-            hdiutil create -volname "PDF Compressor" \
-              -srcfolder "dist/PDF Compressor.app" \
+          if [ -d "dist/SlimPDF.app" ]; then
+            hdiutil create -volname "SlimPDF" \
+              -srcfolder "dist/SlimPDF.app" \
               -ov -format UDZO \
-              dist/PDFCompressor-macOS.dmg
+              dist/SlimPDF-macOS.dmg
           fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PDFCompressor-macOS
+          name: SlimPDF-macOS
           path: |
-            dist/PDFCompressor-macOS.dmg
-            dist/PDF Compressor.app
+            dist/SlimPDF-macOS.dmg
+            dist/SlimPDF.app
 
   # ============================================
   # Windows x64 Build
@@ -123,8 +123,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PDFCompressor-Windows-x64
-          path: dist/PDFCompressor.exe
+          name: SlimPDF-Windows-x64
+          path: dist/SlimPDF.exe
 
   # ============================================
   # Release
@@ -143,7 +143,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/PDFCompressor-macOS/PDFCompressor-macOS.dmg
-            artifacts/PDFCompressor-Windows-x64/PDFCompressor.exe
+            artifacts/SlimPDF-macOS/SlimPDF-macOS.dmg
+            artifacts/SlimPDF-Windows-x64/SlimPDF.exe
           generate_release_notes: true
           draft: false

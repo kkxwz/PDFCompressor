@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================
-# PDF Compressor - macOS Build Script
+# SlimPDF - macOS Build Script
 # ============================================
 set -e
 
@@ -9,7 +9,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
 echo "============================================"
-echo "  PDF Compressor macOS Build"
+echo "  SlimPDF macOS Build"
 echo "============================================"
 
 # 1. Check dependencies
@@ -56,15 +56,15 @@ pyinstaller build.spec --clean --noconfirm
 # 5. Results
 echo "[5/5] Build complete!"
 echo ""
-if [ -d "dist/PDF Compressor.app" ]; then
-    APP_SIZE=$(du -sh "dist/PDF Compressor.app" | cut -f1)
-    echo "  Artifact: dist/PDF Compressor.app ($APP_SIZE)"
+if [ -d "dist/SlimPDF.app" ]; then
+    APP_SIZE=$(du -sh "dist/SlimPDF.app" | cut -f1)
+    echo "  Artifact: dist/SlimPDF.app ($APP_SIZE)"
     echo ""
     echo "  Test run:"
-    echo "    open \"dist/PDF Compressor.app\""
+    echo "    open \"dist/SlimPDF.app\""
     echo ""
     echo "  Distribution:"
-    echo "    1. Create DMG: hdiutil create -volname 'PDF Compressor' -srcfolder 'dist/PDF Compressor.app' -ov dist/PDFCompressor.dmg"
+    echo "    1. Create DMG: hdiutil create -volname 'SlimPDF' -srcfolder 'dist/SlimPDF.app' -ov dist/SlimPDF.dmg"
     echo "    2. Copy .app directly to other Macs"
 else
     echo "  Artifacts in dist/ directory"

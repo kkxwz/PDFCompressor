@@ -1,5 +1,5 @@
 """
-PDF Compressor - Version Management
+SlimPDF - Version Management
 
 Single source of truth for version number.
 """

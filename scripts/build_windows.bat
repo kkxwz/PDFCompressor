@@ -1,11 +1,11 @@
 @echo off
 REM ============================================
-REM PDF Compressor - Windows Build Script
+REM SlimPDF - Windows Build Script
 REM ============================================
 setlocal enabledelayedexpansion
 
 echo ============================================
-echo   PDF Compressor Windows Build
+echo   SlimPDF Windows Build
 echo ============================================
 
 REM Get project root directory
@@ -105,11 +105,11 @@ echo.
 echo ============================================
 echo   Build complete!
 echo ============================================
-if exist "dist\PDFCompressor.exe" (
-    for %%F in ("dist\PDFCompressor.exe") do echo   Artifact: dist\PDFCompressor.exe (%%~zF bytes^)
+if exist "dist\SlimPDF.exe" (
+    for %%F in ("dist\SlimPDF.exe") do echo   Artifact: dist\SlimPDF.exe (%%~zF bytes^)
     echo.
-    echo   Test run: dist\PDFCompressor.exe
-    echo   Distribute: Send PDFCompressor.exe directly to users
+    echo   Test run: dist\SlimPDF.exe
+    echo   Distribute: Send SlimPDF.exe directly to users
 ) else (
     echo   Artifacts in dist\ directory
 )

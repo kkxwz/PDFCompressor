@@ -1,5 +1,5 @@
 """
-PDF Compressor - Global Configuration
+SlimPDF - Global Configuration
 
 Supports both development and PyInstaller frozen environments.
 """
@@ -20,10 +20,10 @@ def get_app_dir() -> str:
         system = platform.system()
         if system == "Windows":
             base = os.environ.get("LOCALAPPDATA", os.path.expanduser("~"))
-            app_dir = os.path.join(base, "PDFCompressor")
+            app_dir = os.path.join(base, "SlimPDF")
         elif system == "Darwin":
             app_dir = os.path.join(os.path.expanduser("~"), "Library",
-                                   "Application Support", "PDFCompressor")
+                                   "Application Support", "SlimPDF")
         else:
             app_dir = os.path.join(os.path.expanduser("~"), ".pdf-compressor")
     else:
