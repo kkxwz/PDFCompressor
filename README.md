@@ -1,7 +1,7 @@
 # SlimPDF
 
 <p align="center">
-  <img src="static/images/logo.svg" width="80" alt="SlimPDF Logo">
+  <img src="static/images/logo.png" width="80" alt="SlimPDF Logo">
 </p>
 
 <p align="center">
@@ -103,12 +103,6 @@ Go to [Releases](https://github.com/kkxwz/PDFCompressor/releases) for the latest
 ## ☕ Support the Author
 
 If this project helped you, buying me a coffee would mean the world — it keeps me motivated to maintain it.
-
-<p align="center">
-  <b>WeChat Donate</b><br><br>
-  <img src="docs/images/wechat-donate.png" width="200" alt="WeChat Donate QR Code"><br><br>
-  <i>A coffee is more than enough ☕</i>
-</p>
 
 <p align="center">
   <b>Join Community</b><br><br>

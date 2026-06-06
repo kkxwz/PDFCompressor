@@ -1,7 +1,7 @@
 # SlimPDF
 
 <p align="center">
-  <img src="static/images/logo.svg" width="80" alt="SlimPDF Logo">
+  <img src="static/images/logo.png" width="80" alt="SlimPDF Logo">
 </p>
 
 <p align="center">
@@ -105,12 +105,6 @@
 ## ☕ 支持作者
 
 如果这个项目帮到了你，欢迎请我喝杯咖啡，让我有动力继续维护它。
-
-<p align="center">
-  <b>微信赞赏码</b><br><br>
-  <img src="docs/images/wechat-donate.png" width="200" alt="WeChat Donate QR Code"><br><br>
-  <i>一杯咖啡就够了 ☕</i>
-</p>
 
 <p align="center">
   <b>加入交流群</b><br><br>
