@@ -1,7 +1,7 @@
-# SlimPDF
+# PDFCompressor
 
 <p align="center">
-  <img src="static/images/logo.png" width="80" alt="SlimPDF Logo">
+  <img src="static/images/logo.png" width="80" alt="PDFCompressor Logo">
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 ## 📸 Preview
 
 <p align="center">
-  <img src="docs/images/screenshot.png" width="720" alt="SlimPDF Screenshot">
+  <img src="docs/images/screenshot.png" width="720" alt="PDFCompressor Screenshot">
 </p>
 
 > Drag in → Pick quality → Done in 3s → Download
@@ -67,7 +67,7 @@ If you've ever been the family IT department, if you've ever wanted your skills 
 | 🚀 **3 Compression Levels** | Low (high quality) / Medium (balanced) / High (smallest size) |
 | 🔒 **Local Processing** | Files never leave your machine. Zero privacy risk. |
 | 📉 **Smart Optimization** | Deduplicate images, subset fonts, convert color spaces |
-| 🖥️ **Cross-Platform** | macOS (Universal) / Windows (x64) |
+| 🖥️ **Cross-Platform** | macOS (Universal) / Windows (x64 / arm64) |
 | 🎯 **One-Click** | Drag → Select → Done. No technical knowledge needed. |
 | 🌙 **Dark Mode** | Dark / Light / System theme support |
 
@@ -80,7 +80,8 @@ Go to [Releases](https://github.com/kkxwz/PDFCompressor/releases) for the latest
 | Platform | Download | Notes |
 |----------|----------|-------|
 | macOS | `SlimPDF-macOS.dmg` | Universal Binary (Intel + Apple Silicon) |
-| Windows | `SlimPDF-Windows-x64.exe` | 64-bit Windows 10/11 |
+| Windows (x64) | `SlimPDF-Windows-x64.exe` | 64-bit Windows 10/11 |
+| Windows (arm64) | `SlimPDF-Windows-arm64.exe` | Windows 11 on ARM |
 
 ### System Requirements
 

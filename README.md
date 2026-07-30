@@ -1,7 +1,7 @@
-# SlimPDF
+# PDFCompressor
 
 <p align="center">
-  <img src="static/images/logo.png" width="80" alt="SlimPDF Logo">
+  <img src="static/images/logo.png" width="80" alt="PDFCompressor Logo">
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 ## 📸 预览
 
 <p align="center">
-  <img src="docs/images/screenshot.png" width="720" alt="SlimPDF Screenshot">
+  <img src="docs/images/screenshot.png" width="720" alt="PDFCompressor Screenshot">
 </p>
 
 > 拖拽文件 → 选择压缩级别 → 3 秒完成 → 下载结果
@@ -69,7 +69,7 @@
 | 🚀 **三档压缩** | 轻度（高质量）/ 中度（平衡）/ 高度（最小体积） |
 | 🔒 **本地处理** | 文件不上传云端，隐私绝对安全 |
 | 📉 **智能优化** | 自动检测重复图像、优化字体嵌入、转换颜色空间 |
-| 🖥️ **跨平台** | macOS (Universal) / Windows (x64) |
+| 🖥️ **跨平台** | macOS (Universal) / Windows (x64 / arm64) |
 | 🎯 **一键操作** | 拖拽 → 选择 → 完成，无需任何技术背景 |
 | 🌙 **深色模式** | 支持深色/浅色/跟随系统三种主题 |
 
@@ -82,7 +82,8 @@
 | 平台 | 下载 | 说明 |
 |------|------|------|
 | macOS | `SlimPDF-macOS.dmg` | Universal Binary (Intel + Apple Silicon) |
-| Windows | `SlimPDF-Windows-x64.exe` | 64-bit Windows 10/11 |
+| Windows (x64) | `SlimPDF-Windows-x64.exe` | 64-bit Windows 10/11 |
+| Windows (arm64) | `SlimPDF-Windows-arm64.exe` | Windows 11 on ARM |
 
 ### 系统要求
 
