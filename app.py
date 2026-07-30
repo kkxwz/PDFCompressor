@@ -8,11 +8,14 @@ Visit: http://127.0.0.1:5000
 """
 import os
 import sys
+import signal
 import logging
 import webbrowser
 import threading
 import atexit
 from logging.handlers import RotatingFileHandler
+from types import FrameType
+from typing import Optional
 
 from flask import Flask, Response, render_template, jsonify, send_from_directory
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -151,6 +154,13 @@ if __name__ == "__main__":
     # have run if the process was killed), then register exit cleanup
     cleanup_temp_files()
     atexit.register(cleanup_temp_files)
+
+    # Graceful shutdown on SIGTERM (used by scripts/server.sh): raise
+    # SystemExit so atexit cleanup runs; by default SIGTERM would skip it
+    def _handle_sigterm(signum: int, frame: Optional[FrameType]) -> None:
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _handle_sigterm)
 
     # Delayed browser open (auto-open in both frozen and production mode)
     if not config.DEBUG:

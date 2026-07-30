@@ -142,8 +142,17 @@ cd PDFCompressor
 # 安装依赖
 pip install -r requirements.txt
 
-# 本地运行
+# 本地运行（前台）
 python app.py
+
+# 或使用服务控制脚本（后台运行，推荐）
+bash scripts/server.sh start     # 启动（含健康检查，日志写入 logs/server.log）
+bash scripts/server.sh status    # 查看运行状态
+bash scripts/server.sh restart   # 优雅重启
+bash scripts/server.sh stop      # 优雅停止（自动清理临时文件）
+
+# 换端口运行
+SLIMPDF_PORT=5050 bash scripts/server.sh start
 ```
 
 ### 构建

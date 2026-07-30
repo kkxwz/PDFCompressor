@@ -134,8 +134,17 @@ cd PDFCompressor
 # Install dependencies
 pip install -r requirements.txt
 
-# Run locally
+# Run locally (foreground)
 python app.py
+
+# Or use the server control script (background, recommended)
+bash scripts/server.sh start     # start with health check, logs to logs/server.log
+bash scripts/server.sh status    # check running status
+bash scripts/server.sh restart   # graceful restart
+bash scripts/server.sh stop      # graceful stop (cleans up temp files)
+
+# Run on a custom port
+SLIMPDF_PORT=5050 bash scripts/server.sh start
 ```
 
 ### Build
