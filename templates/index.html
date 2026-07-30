@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title data-i18n="app.docTitle">SlimPDF - 专业 PDF 压缩工具</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/logo.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='images/logo.png') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body data-max-upload-mb="{{ max_upload_mb | default(100) }}"

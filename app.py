@@ -14,7 +14,7 @@ import threading
 import atexit
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, Response, render_template, jsonify
+from flask import Flask, Response, render_template, jsonify, send_from_directory
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import config
@@ -93,6 +93,15 @@ def create_app() -> Flask:
             max_upload_mb=config.MAX_UPLOAD_MB,
             cleanup_minutes=config.FILE_CLEANUP_SECONDS // 60,
             version=config.VERSION,
+        )
+
+    # Some browsers request /favicon.ico directly regardless of <link> tags
+    @app.route("/favicon.ico")
+    def favicon() -> Response:
+        return send_from_directory(
+            os.path.join(app.static_folder or "static", "images"),
+            "logo.png",
+            mimetype="image/png",
         )
 
     return app
