@@ -27,7 +27,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.lock
           pip install pytest
 
       - name: Run tests
@@ -44,7 +44,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.lock
           pip install pyinstaller
 
       - name: Install Ghostscript
@@ -102,7 +102,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r requirements.lock
           pip install pyinstaller
 
       - name: Install Ghostscript
@@ -142,17 +142,85 @@ jobs:
       - name: PyInstaller Build
         run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
 
+      - name: Rename artifact
+        shell: pwsh
+        run: Rename-Item dist/SlimPDF.exe SlimPDF-Windows-x64.exe
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SlimPDF-Windows-x64
-          path: dist/SlimPDF.exe
+          path: dist/SlimPDF-Windows-x64.exe
+
+  # ============================================
+  # Windows arm64 Build
+  # ============================================
+  # Note: Artifex does not ship official arm64 gs binaries, so the x64
+  # Ghostscript is bundled and runs under Windows-on-ARM x64 emulation
+  # (config.py falls back to vendor/ghostscript/x64 when arm64 is absent)
+  build-windows-arm64:
+    needs: test
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.lock
+          pip install pyinstaller
+
+      - name: Install Ghostscript
+        shell: pwsh
+        run: |
+          choco install ghostscript --no-progress -y
+          $gsPath = (Get-Command gswin64c -ErrorAction SilentlyContinue).Source
+          if (-not $gsPath) {
+            $searchPaths = @(
+              "C:\Program Files\gs\*\bin\gswin64c.exe",
+              "C:\Program Files (x86)\gs\*\bin\gswin64c.exe"
+            )
+            foreach ($pattern in $searchPaths) {
+              $found = Get-Item $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($found) { $gsPath = $found.FullName; break }
+            }
+          }
+          if ($gsPath) {
+            Write-Host "Found Ghostscript: $gsPath"
+            $binDir = Split-Path $gsPath -Parent
+            $destDir = "vendor\ghostscript\x64"
+            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+            Copy-Item "$gsPath" "$destDir\" -Force
+            Copy-Item "$binDir\*.dll" "$destDir\" -Force
+            $libDir = Join-Path (Split-Path $binDir -Parent) "lib"
+            if (Test-Path $libDir) {
+              Copy-Item -Recurse -Force "$libDir" "$destDir\lib"
+            }
+          } else {
+            Write-Host "WARNING: Ghostscript not found, build may fail"
+          }
+
+      - name: PyInstaller Build
+        run: pyinstaller build.spec --clean --noconfirm --log-level=DEBUG
+
+      - name: Rename artifact
+        shell: pwsh
+        run: Rename-Item dist/SlimPDF.exe SlimPDF-Windows-arm64.exe
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: SlimPDF-Windows-arm64
+          path: dist/SlimPDF-Windows-arm64.exe
 
   # ============================================
   # Release
   # ============================================
   release:
-    needs: [build-macos, build-windows-x64]
+    needs: [build-macos, build-windows-x64, build-windows-arm64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -166,6 +234,7 @@ jobs:
         with:
           files: |
             artifacts/SlimPDF-macOS/SlimPDF-macOS.dmg
-            artifacts/SlimPDF-Windows-x64/SlimPDF.exe
+            artifacts/SlimPDF-Windows-x64/SlimPDF-Windows-x64.exe
+            artifacts/SlimPDF-Windows-arm64/SlimPDF-Windows-arm64.exe
           generate_release_notes: true
           draft: false

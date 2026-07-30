@@ -11,7 +11,7 @@ import subprocess
 import threading
 import logging
 from collections import deque
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import config
 from compress.profiles import get_profile
@@ -72,7 +72,7 @@ def _validate_output_path(path: str) -> bool:
 
 
 def _build_gs_command(gs_path: str, input_path: str, output_path: str,
-                      profile: dict) -> list:
+                      profile: dict[str, Any]) -> list[str]:
     """
     Build Ghostscript CLI argument list
 
@@ -226,8 +226,8 @@ def compress_pdf(
     output_path: str,
     level: str = "medium",
     progress_callback: Optional[Callable[[int, str], None]] = None,
-    timeout: int = None
-) -> dict:
+    timeout: Optional[int] = None
+) -> dict[str, Any]:
     """
     Compress PDF file
 
@@ -308,12 +308,13 @@ def compress_pdf(
         )
 
         # Keep the tail of output for error reporting
-        output_tail: deque = deque(maxlen=50)
+        output_tail: deque[str] = deque(maxlen=50)
 
-        def _drain_output():
+        def _drain_output() -> None:
             """Drain output in a background thread (prevents pipe-buffer deadlock
             and keeps process.wait(timeout=...) effective)"""
             current_progress = 10
+            assert process.stdout is not None  # PIPE was requested above
             for raw_line in process.stdout:
                 line = raw_line.strip()
                 if not line:

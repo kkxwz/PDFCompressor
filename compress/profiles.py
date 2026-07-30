@@ -7,6 +7,7 @@ Key parameter notes:
 - HSamples/VSamples: [2 1 1 2] for 4:2:0 chroma subsampling, extra 25% savings
 - Downsampling algorithm: Bicubic smoothest, Average faster
 """
+from typing import Any
 
 
 # Low compression (high quality priority) - visually lossless
@@ -171,14 +172,14 @@ HIGH_COMPRESSION = {
 
 
 # Compression level mapping
-COMPRESSION_PROFILES = {
+COMPRESSION_PROFILES: dict[str, dict[str, Any]] = {
     "low": LOW_COMPRESSION,
     "medium": MEDIUM_COMPRESSION,
     "high": HIGH_COMPRESSION,
 }
 
 
-def get_profile(level: str) -> dict:
+def get_profile(level: str) -> dict[str, Any]:
     """Get compression parameters for specified level"""
     if level not in COMPRESSION_PROFILES:
         raise ValueError(f"Unknown compression level: {level}, available: {list(COMPRESSION_PROFILES.keys())}")

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pdf-compressor"
-version = "1.0.0"
+dynamic = ["version"]
 description = "One-click PDF compression. Local processing. Privacy first."
 readme = "README.md"
 license = {text = "MIT"}
@@ -28,6 +28,10 @@ dev = [
 
 [tool.setuptools]
 py-modules = []
+
+[tool.setuptools.dynamic]
+# Single source of truth for the version number
+version = {attr = "__version__.__version__"}
 
 [tool.black]
 line-length = 100
@@ -77,6 +81,14 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 show_error_codes = true
+files = [
+    "app.py",
+    "config.py",
+    "utils.py",
+    "__version__.py",
+    "routes",
+    "compress",
+]
 
 [[tool.mypy.overrides]]
 module = "compress.*"

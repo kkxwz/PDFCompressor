@@ -6,6 +6,9 @@ import re
 import json
 import time
 import glob
+from collections.abc import Iterator
+from typing import Optional
+
 from flask import Blueprint, request, jsonify, Response, send_file, stream_with_context
 
 import config
@@ -19,7 +22,7 @@ _UUID_RE = re.compile(
 )
 
 
-def _find_upload_file(file_id: str) -> tuple:
+def _find_upload_file(file_id: str) -> tuple[Optional[str], Optional[str]]:
     """Find uploaded file by file_id, return (file_path, original_filename)"""
     # Validate format first: prevents glob wildcards / path separators injection
     if not _UUID_RE.match(file_id):
@@ -38,7 +41,7 @@ def _find_upload_file(file_id: str) -> tuple:
 
 
 @compress_bp.route("/api/compress", methods=["POST"])
-def start_compress():
+def start_compress() -> tuple[Response, int]:
     """Start compression task"""
     # silent=True: malformed JSON returns None instead of raising;
     # explicit None check so an empty JSON object {} still reaches the
@@ -68,7 +71,7 @@ def start_compress():
 
     # Find uploaded file
     input_path, original_filename = _find_upload_file(file_id)
-    if not input_path:
+    if input_path is None or original_filename is None:
         return jsonify({
             "error": "FILE_NOT_FOUND",
             "message": "Uploaded file not found, please re-upload"
@@ -92,7 +95,7 @@ def start_compress():
 
 
 @compress_bp.route("/api/progress/<task_id>")
-def get_progress(task_id: str):
+def get_progress(task_id: str) -> Response | tuple[Response, int]:
     """SSE progress push"""
     task_manager = get_task_manager()
     task = task_manager.get_task(task_id)
@@ -103,7 +106,7 @@ def get_progress(task_id: str):
             "message": "Task not found"
         }), 404
 
-    def generate():
+    def generate() -> Iterator[str]:
         """Generate SSE event stream"""
         last_progress = -1
         # Hard deadline so the stream can never outlive a stuck task
@@ -116,7 +119,7 @@ def get_progress(task_id: str):
 
             # Only send event when progress updates
             if current_progress != last_progress or current_status in (TaskStatus.DONE, TaskStatus.ERROR):
-                data = {
+                data: dict[str, object] = {
                     "stage": current_status,
                     "progress": current_progress,
                     "message": task.stage_message,
@@ -165,7 +168,7 @@ def get_progress(task_id: str):
 
 
 @compress_bp.route("/api/download/<task_id>")
-def download_file(task_id: str):
+def download_file(task_id: str) -> Response | tuple[Response, int]:
     """Download compression result"""
     task_manager = get_task_manager()
     task = task_manager.get_task(task_id)

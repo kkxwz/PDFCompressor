@@ -4,6 +4,110 @@
 (function() {
     'use strict';
 
+    // ========== Backend-injected Config (single source: config.py) ==========
+    const APP_CONFIG = {
+        maxUploadMB: parseInt(document.body.dataset.maxUploadMb, 10) || 100,
+        cleanupMinutes: parseInt(document.body.dataset.cleanupMinutes, 10) || 5,
+        version: document.body.dataset.appVersion || ''
+    };
+
+    // ========== i18n ==========
+    const LANG_KEY = 'slimpdf-lang';
+    const SUPPORTED_LANGS = ['zh', 'en'];
+    let currentLang = localStorage.getItem(LANG_KEY);
+    if (!SUPPORTED_LANGS.includes(currentLang)) {
+        currentLang = (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en';
+    }
+    let i18nDict = null;
+    const langToggle = document.getElementById('langToggle');
+
+    // Values interpolated into locale strings like "{maxMB}"
+    const GLOBAL_I18N_ARGS = {
+        maxMB: APP_CONFIG.maxUploadMB,
+        minutes: APP_CONFIG.cleanupMinutes
+    };
+
+    function t(key, args) {
+        // Resolve "a.b.c" in the loaded dict; fall back to the key itself
+        let value = i18nDict;
+        for (const part of key.split('.')) {
+            value = value ? value[part] : undefined;
+        }
+        if (typeof value !== 'string') return key;
+        const merged = Object.assign({}, GLOBAL_I18N_ARGS, args);
+        return value.replace(/\{(\w+)\}/g, (m, name) =>
+            merged[name] !== undefined ? merged[name] : m);
+    }
+
+    function applyI18n() {
+        document.documentElement.setAttribute('lang', currentLang === 'zh' ? 'zh-CN' : 'en');
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            el.textContent = t(el.dataset.i18n);
+        });
+        document.querySelectorAll('[data-i18n-title]').forEach(el => {
+            el.title = t(el.dataset.i18nTitle);
+        });
+        document.title = t('app.docTitle');
+        langToggle.querySelectorAll('.lang-toggle-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.langValue === currentLang);
+        });
+    }
+
+    async function loadLocale(lang) {
+        const res = await fetch(`/static/locales/${lang}.json`);
+        if (!res.ok) throw new Error(`locale ${lang} not found`);
+        return res.json();
+    }
+
+    async function setLanguage(lang) {
+        try {
+            i18nDict = await loadLocale(lang);
+            currentLang = lang;
+            localStorage.setItem(LANG_KEY, lang);
+            applyI18n();
+        } catch (e) {
+            console.error('Failed to load locale:', e);
+        }
+    }
+
+    langToggle.addEventListener('click', (e) => {
+        const btn = e.target.closest('.lang-toggle-btn');
+        if (!btn || btn.dataset.langValue === currentLang) return;
+        setLanguage(btn.dataset.langValue);
+    });
+
+    // Map backend error codes to locale keys (never show raw backend English)
+    const ERROR_CODE_KEYS = {
+        NO_FILE: 'errors.noFile',
+        ONLY_PDF: 'errors.onlyPdf',
+        FILE_TOO_LARGE: 'errors.fileTooLarge',
+        MISSING_FILE_ID: 'errors.missingFileId',
+        INVALID_REQUEST: 'errors.invalidRequest',
+        INVALID_LEVEL: 'errors.startCompressionFailed',
+        FILE_NOT_FOUND: 'errors.fileNotFound',
+        SAVE_FAILED: 'errors.uploadFailed',
+        TASK_NOT_FOUND: 'errors.compressionFailed'
+    };
+
+    function messageForError(code, fallbackKey, backendMessage) {
+        if (code && ERROR_CODE_KEYS[code]) return t(ERROR_CODE_KEYS[code]);
+        if (backendMessage) return backendMessage;
+        return t(fallbackKey || 'errors.unknown');
+    }
+
+    // Localize backend SSE stage messages (backend emits English)
+    function localizeProgressMessage(message) {
+        if (!message) return t('progress.processing');
+        const pageMatch = message.match(/page (\d+)\/(\d+)/i);
+        if (pageMatch) {
+            return t('progress.page', { current: pageMatch[1], total: pageMatch[2] });
+        }
+        if (/analyzing/i.test(message)) return t('progress.analyzing');
+        if (/complete/i.test(message)) return t('app.compressionComplete');
+        if (/compressing/i.test(message)) return t('progress.processing');
+        return message;
+    }
+
     // ========== Theme Switching ==========
     const THEME_KEY = 'pdf-compressor-theme';
     const themeToggle = document.getElementById('themeToggle');
@@ -149,13 +253,13 @@
     function handleFile(file) {
         // Check MIME type first, then fallback to extension
         if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
-            showError('Only PDF format files are supported. Please select a .pdf file.');
+            showError(t('errors.onlyPdf'));
             return;
         }
 
-        const maxSize = 100 * 1024 * 1024;
+        const maxSize = APP_CONFIG.maxUploadMB * 1024 * 1024;
         if (file.size > maxSize) {
-            showError(`File too large (${formatSize(file.size)}), max supported 100MB`);
+            showError(t('errors.fileTooLarge'));
             return;
         }
 
@@ -169,7 +273,7 @@
         fileName.textContent = file.name;
         fileSize.textContent = formatSize(file.size);
         btnCompress.disabled = true;
-        btnCompress.innerHTML = '<span>Uploading...</span>';
+        btnCompress.innerHTML = `<span>${t('app.uploading')}</span>`;
 
         const formData = new FormData();
         formData.append('file', file);
@@ -183,7 +287,7 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || 'Upload failed');
+                throw new Error(messageForError(data.error, 'errors.uploadFailed', data.message));
             }
 
             currentFileId = data.file_id;
@@ -197,13 +301,13 @@
                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                     <path d="M3 10l4 4L17 4" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                <span>Start Compression</span>
+                <span data-i18n="app.startCompression">${t('app.startCompression')}</span>
                 <div class="btn-shimmer"></div>
             `;
 
         } catch (error) {
             console.error('Upload failed:', error);
-            showError(error.message || 'File upload failed, please try again');
+            showError(error.message || t('errors.uploadFailed'));
             resetUpload();
         }
     }
@@ -229,7 +333,7 @@
 
     async function startCompression() {
         if (!currentFileId) {
-            showError('Please upload a file first');
+            showError(t('errors.missingFileId'));
             return;
         }
 
@@ -239,8 +343,8 @@
         progressFill.style.width = '0%';
         progressPercent.textContent = '0';
         setRingProgress(0);
-        progressMessage.textContent = 'Starting compression engine...';
-        progressTitle.textContent = 'Compressing...';
+        progressMessage.textContent = t('progress.starting');
+        progressTitle.textContent = t('app.compressing');
 
         try {
             const response = await fetch('/api/compress', {
@@ -255,14 +359,14 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || 'Failed to start compression');
+                throw new Error(messageForError(data.error, 'errors.startCompressionFailed', data.message));
             }
 
             listenProgress(data.task_id);
 
         } catch (error) {
             console.error('Failed to start compression:', error);
-            showError(error.message || 'Failed to start compression, please try again');
+            showError(error.message || t('errors.startCompressionFailed'));
         }
     }
 
@@ -278,7 +382,7 @@
             progressFill.style.width = `${progress}%`;
             progressPercent.textContent = progress;
             setRingProgress(progress);
-            progressMessage.textContent = data.message || 'Processing...';
+            progressMessage.textContent = localizeProgressMessage(data.message);
 
             if (data.stage === 'done') {
                 eventSource.close();
@@ -286,7 +390,7 @@
                 showResult(data.result);
             } else if (data.stage === 'error') {
                 eventSource.close();
-                showError(data.error || 'Compression failed');
+                showError(data.error || t('errors.compressionFailed'));
             }
         };
 
@@ -309,11 +413,11 @@
                                 }
                             })
                             .catch(() => {
-                                showError('Connection interrupted. Please refresh the page and try again.');
+                                showError(t('errors.connectionInterrupted'));
                             });
                     })
                     .catch(() => {
-                        showError('Server unreachable. Please check if the application is running.');
+                        showError(t('errors.serverUnreachable'));
                     });
             }, 1000);
         };
@@ -332,7 +436,7 @@
 
         if (result.warning) {
             resultWarning.style.display = 'flex';
-            warningText.textContent = result.warning;
+            warningText.textContent = t('result.warning');
         } else {
             resultWarning.style.display = 'none';
         }
@@ -345,13 +449,15 @@
     // ========== Initialization ==========
     updateSteps(1);
 
-    fetch('/api/health')
-        .then(res => res.json())
-        .then(data => {
-            if (!data.ghostscript.available) {
-                showError('Ghostscript not installed. Compression is unavailable. Please install Ghostscript first.');
-            }
-        })
-        .catch(() => {});
+    setLanguage(currentLang).then(() => {
+        fetch('/api/health')
+            .then(res => res.json())
+            .then(data => {
+                if (!data.ghostscript.available) {
+                    showError(t('errors.ghostscriptNotFound'));
+                }
+            })
+            .catch(() => {});
+    });
 
 })();

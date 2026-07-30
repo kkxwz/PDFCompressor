@@ -13,7 +13,7 @@ import threading
 import time
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
+from typing import Any, Optional
 
 import config
 from compress.engine import compress_pdf
@@ -43,19 +43,19 @@ class Task:
         self.status = TaskStatus.PENDING
         self.progress = 0
         self.stage_message = ""
-        self.result = None
-        self.error = None
+        self.result: Optional[dict[str, Any]] = None
+        self.error: Optional[str] = None
 
         self.created_at = time.time()
 
-    def update_progress(self, progress: int, message: str):
+    def update_progress(self, progress: int, message: str) -> None:
         """Update progress (thread-safe)"""
         self.progress = progress
         self.stage_message = message
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dict"""
-        data = {
+        data: dict[str, Any] = {
             "task_id": self.task_id,
             "status": self.status,
             "progress": self.progress,
@@ -101,11 +101,11 @@ class TaskManager:
 
         return task
 
-    def start_task(self, task: Task):
+    def start_task(self, task: Task) -> None:
         """Async start compression task"""
         task.status = TaskStatus.PROCESSING
 
-        def run_compression():
+        def run_compression() -> None:
             try:
                 result = compress_pdf(
                     input_path=task.input_path,
@@ -151,13 +151,13 @@ class TaskManager:
         with self.lock:
             return self.tasks.get(task_id)
 
-    def _cleanup_loop(self):
+    def _cleanup_loop(self) -> None:
         """Periodic cleanup of expired tasks and files"""
         while True:
             time.sleep(60)  # Check every minute
             self._cleanup_expired()
 
-    def _cleanup_expired(self):
+    def _cleanup_expired(self) -> None:
         """Clean up expired tasks"""
         current_time = time.time()
         tasks_to_remove = []
@@ -176,13 +176,13 @@ class TaskManager:
                     tasks_to_remove.append(task_id)
 
             for task_id in tasks_to_remove:
-                task = self.tasks.pop(task_id, None)
-                if task:
+                task_to_clean: Optional[Task] = self.tasks.pop(task_id, None)
+                if task_to_clean:
                     # Clean up output file
-                    if os.path.isfile(task.output_path):
+                    if os.path.isfile(task_to_clean.output_path):
                         try:
-                            os.remove(task.output_path)
-                            logger.info(f"Cleaned up output file: {task.output_path}")
+                            os.remove(task_to_clean.output_path)
+                            logger.info(f"Cleaned up output file: {task_to_clean.output_path}")
                         except Exception as e:
                             logger.warning(f"Failed to clean up output file: {e}")
 

@@ -12,19 +12,43 @@ import logging
 import webbrowser
 import threading
 import atexit
+from logging.handlers import RotatingFileHandler
 
-from flask import Flask, render_template, jsonify
+from flask import Flask, Response, render_template, jsonify
+from werkzeug.exceptions import RequestEntityTooLarge
 
 import config
 from routes.upload import upload_bp
 from routes.compress import compress_bp
 from routes.health import health_bp
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+
+def _setup_logging() -> None:
+    """Console logging always; in frozen (desktop) mode also persist logs to
+    APP_DIR/logs so user-side issues can be diagnosed after the fact"""
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+
+    if config.is_frozen():
+        log_dir = os.path.join(config.APP_DIR, "logs")
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            handlers.append(RotatingFileHandler(
+                os.path.join(log_dir, "slimpdf.log"),
+                maxBytes=1 * 1024 * 1024,  # 1MB x 3 backups
+                backupCount=3,
+                encoding="utf-8",
+            ))
+        except OSError:
+            pass  # Logging must never block startup
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=handlers,
+    )
+
+
+_setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -54,17 +78,22 @@ def create_app() -> Flask:
 
     # Return JSON (not Flask's default HTML page) when MAX_CONTENT_LENGTH is hit
     @app.errorhandler(413)
-    def request_entity_too_large(e):
-        max_mb = config.MAX_CONTENT_LENGTH // (1024 * 1024)
+    def request_entity_too_large(e: RequestEntityTooLarge) -> tuple[Response, int]:
         return jsonify({
             "error": "FILE_TOO_LARGE",
-            "message": f"File too large, max supported {max_mb}MB"
+            "message": f"File too large, max supported {config.MAX_UPLOAD_MB}MB"
         }), 413
 
-    # Home route
+    # Home route (injects config-derived values so the frontend never
+    # hardcodes the upload limit / cleanup interval / version)
     @app.route("/")
-    def index():
-        return render_template("index.html")
+    def index() -> str:
+        return render_template(
+            "index.html",
+            max_upload_mb=config.MAX_UPLOAD_MB,
+            cleanup_minutes=config.FILE_CLEANUP_SECONDS // 60,
+            version=config.VERSION,
+        )
 
     return app
 
@@ -72,12 +101,12 @@ def create_app() -> Flask:
 app = create_app()
 
 
-def open_browser():
+def open_browser() -> None:
     """Auto-open browser"""
     webbrowser.open(f"http://{config.HOST}:{config.PORT}")
 
 
-def cleanup_temp_files():
+def cleanup_temp_files() -> None:
     """Clean up temp files on exit"""
     import shutil
     for folder in [config.UPLOAD_FOLDER, config.OUTPUT_FOLDER]:
@@ -93,7 +122,7 @@ def cleanup_temp_files():
 
 if __name__ == "__main__":
     logger.info("=" * 50)
-    logger.info("SlimPDF starting...")
+    logger.info(f"SlimPDF v{config.VERSION} starting...")
     logger.info(f"Visit: http://{config.HOST}:{config.PORT}")
     logger.info(f"App data: {config.APP_DIR}")
     logger.info(f"Resource dir: {config.RESOURCE_DIR}")

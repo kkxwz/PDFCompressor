@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SlimPDF - Professional PDF Compression Tool</title>
+    <title data-i18n="app.docTitle">SlimPDF - 专业 PDF 压缩工具</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body data-max-upload-mb="{{ max_upload_mb | default(100) }}"
+      data-cleanup-minutes="{{ cleanup_minutes | default(5) }}"
+      data-app-version="{{ version | default('') }}">
     <!-- 背景装饰 -->
     <div class="bg-decoration">
         <div class="bg-circle bg-circle-1"></div>
@@ -27,19 +29,23 @@
                 <span class="brand-text">SlimPDF</span>
             </div>
             <div class="topbar-actions">
+                <div class="lang-toggle" id="langToggle">
+                    <button class="lang-toggle-btn" data-lang-value="zh">中</button>
+                    <button class="lang-toggle-btn" data-lang-value="en">EN</button>
+                </div>
                 <div class="theme-toggle" id="themeToggle">
-                    <button class="theme-toggle-btn" data-theme-value="dark" title="深色模式">
+                    <button class="theme-toggle-btn" data-theme-value="dark" title="深色模式" data-i18n-title="theme.dark">
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M17.5 10.5a7.5 7.5 0 0 1-10-7 7.5 7.5 0 1 0 10 7z" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </button>
-                    <button class="theme-toggle-btn" data-theme-value="light" title="浅色模式">
+                    <button class="theme-toggle-btn" data-theme-value="light" title="浅色模式" data-i18n-title="theme.light">
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="10" cy="10" r="3.5"/>
                             <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.93 4.93l1.41 1.41M13.66 13.66l1.41 1.41M4.93 15.07l1.41-1.41M13.66 6.34l1.41-1.41" stroke-linecap="round"/>
                         </svg>
                     </button>
-                    <button class="theme-toggle-btn" data-theme-value="system" title="跟随系统">
+                    <button class="theme-toggle-btn" data-theme-value="system" title="跟随系统" data-i18n-title="theme.system">
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                             <rect x="2" y="3" width="16" height="12" rx="2"/>
                             <path d="M7 18h6M10 15v3" stroke-linecap="round"/>
@@ -50,7 +56,7 @@
                     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M8 1l2 3h3.5l-2.5 2.5L12 10l-4-2-4 2 1-3.5L2.5 4H6z" stroke-linejoin="round"/>
                     </svg>
-                    本地处理 · 隐私安全
+                    <span data-i18n="app.badge">本地处理 · 隐私安全</span>
                 </div>
             </div>
         </nav>
@@ -61,9 +67,9 @@
             <section class="hero">
                 <div class="hero-content">
                     <h1 class="hero-title">
-                        <span class="hero-title-line">PDF 智能压缩</span>
+                        <span class="hero-title-line" data-i18n="app.heroTitle">PDF 智能压缩</span>
                     </h1>
-                    <p class="hero-desc">采用 Ghostscript 专业压缩引擎，在保持文档视觉质量的同时，显著减小文件体积</p>
+                    <p class="hero-desc" data-i18n="app.heroDesc">采用 Ghostscript 专业压缩引擎，在保持文档视觉质量的同时，显著减小文件体积</p>
                 </div>
                 <div class="hero-features">
                     <div class="feature-item">
@@ -71,21 +77,21 @@
                             <circle cx="10" cy="10" r="8"/>
                             <path d="M7 10l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>最高 90% 压缩率</span>
+                        <span data-i18n="app.feature1">最高 90% 压缩率</span>
                     </div>
                     <div class="feature-item">
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="10" cy="10" r="8"/>
                             <path d="M7 10l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>视觉质量无损</span>
+                        <span data-i18n="app.feature2">视觉质量无损</span>
                     </div>
                     <div class="feature-item">
                         <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                             <circle cx="10" cy="10" r="8"/>
                             <path d="M7 10l2 2 4-4" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
-                        <span>文件不离开本地</span>
+                        <span data-i18n="app.feature3">文件不离开本地</span>
                     </div>
                 </div>
             </section>
@@ -96,17 +102,17 @@
                 <div class="steps-indicator" id="stepsIndicator">
                     <div class="step active" data-step="1">
                         <span class="step-number">1</span>
-                        <span class="step-label">选择文件</span>
+                        <span class="step-label" data-i18n="app.step1">选择文件</span>
                     </div>
                     <div class="step-line"></div>
                     <div class="step" data-step="2">
                         <span class="step-number">2</span>
-                        <span class="step-label">设置参数</span>
+                        <span class="step-label" data-i18n="app.step2">设置参数</span>
                     </div>
                     <div class="step-line"></div>
                     <div class="step" data-step="3">
                         <span class="step-number">3</span>
-                        <span class="step-label">压缩完成</span>
+                        <span class="step-label" data-i18n="app.step3">压缩完成</span>
                     </div>
                 </div>
 
@@ -122,11 +128,11 @@
                                 </svg>
                             </div>
                             <div class="drop-zone-text">
-                                <p class="drop-title">拖拽 PDF 文件至此处</p>
+                                <p class="drop-title" data-i18n="app.dragDrop">拖拽 PDF 文件至此处</p>
                                 <p class="drop-subtitle">
-                                    <span class="drop-link">点击选择文件</span>
+                                    <span class="drop-link" data-i18n="app.clickSelect">点击选择文件</span>
                                     <span class="drop-divider">|</span>
-                                    支持 PDF 格式，最大 100MB
+                                    <span data-i18n="app.dropHint">支持 PDF 格式，最大 {{ max_upload_mb | default(100) }}MB</span>
                                 </p>
                             </div>
                             <input type="file" id="fileInput" accept=".pdf" hidden>
@@ -144,7 +150,7 @@
                                 <span class="file-bar-name" id="fileName">document.pdf</span>
                                 <span class="file-bar-size" id="fileSize">20.0 MB</span>
                             </div>
-                            <button class="file-bar-remove" id="btnRemove" title="移除文件">
+                            <button class="file-bar-remove" id="btnRemove" title="移除文件" data-i18n-title="app.removeFile">
                                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                                     <path d="M15 5L5 15M5 5l10 10" stroke-linecap="round"/>
                                 </svg>
@@ -155,7 +161,7 @@
                     <!-- Step 2: 选项 + 压缩中 -->
                     <div class="card-body" id="optionsSection" style="display: none;">
                         <div class="option-group">
-                            <label class="option-label">压缩质量</label>
+                            <label class="option-label" data-i18n="app.qualityLabel">压缩质量</label>
                             <div class="quality-grid">
                                 <label class="quality-item">
                                     <input type="radio" name="quality" value="low">
@@ -166,8 +172,8 @@
                                             </svg>
                                         </div>
                                         <div class="quality-text">
-                                            <span class="quality-name">轻度压缩</span>
-                                            <span class="quality-meta">高质量 · 适合打印</span>
+                                            <span class="quality-name" data-i18n="app.qualityLowName">轻度压缩</span>
+                                            <span class="quality-meta" data-i18n="app.qualityLowMeta">高质量 · 适合打印</span>
                                         </div>
                                         <span class="quality-tag">50-70%</span>
                                     </div>
@@ -175,7 +181,7 @@
                                 <label class="quality-item">
                                     <input type="radio" name="quality" value="medium" checked>
                                     <div class="quality-card quality-card-active">
-                                        <div class="quality-recommend-badge">推荐</div>
+                                        <div class="quality-recommend-badge" data-i18n="app.recommended">推荐</div>
                                         <div class="quality-icon quality-icon-med">
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                                                 <path d="M12 3v18M3 12h18" stroke-linecap="round"/>
@@ -183,8 +189,8 @@
                                             </svg>
                                         </div>
                                         <div class="quality-text">
-                                            <span class="quality-name">中度压缩</span>
-                                            <span class="quality-meta">质量与大小平衡</span>
+                                            <span class="quality-name" data-i18n="app.qualityMediumName">中度压缩</span>
+                                            <span class="quality-meta" data-i18n="app.qualityMediumMeta">质量与大小平衡</span>
                                         </div>
                                         <span class="quality-tag">80-90%</span>
                                     </div>
@@ -198,8 +204,8 @@
                                             </svg>
                                         </div>
                                         <div class="quality-text">
-                                            <span class="quality-name">高度压缩</span>
-                                            <span class="quality-meta">最小文件体积</span>
+                                            <span class="quality-name" data-i18n="app.qualityHighName">高度压缩</span>
+                                            <span class="quality-meta" data-i18n="app.qualityHighMeta">最小文件体积</span>
                                         </div>
                                         <span class="quality-tag">85-95%</span>
                                     </div>
@@ -211,7 +217,7 @@
                             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                                 <path d="M3 10l4 4L17 4" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
-                            <span>开始压缩</span>
+                            <span data-i18n="app.startCompression">开始压缩</span>
                             <div class="btn-shimmer"></div>
                         </button>
                     </div>
@@ -230,8 +236,8 @@
                                 </div>
                             </div>
                             <div class="progress-info">
-                                <h3 class="progress-title" id="progressTitle">正在压缩...</h3>
-                                <p class="progress-desc" id="progressMessage">准备中...</p>
+                                <h3 class="progress-title" id="progressTitle" data-i18n="app.compressing">正在压缩...</h3>
+                                <p class="progress-desc" id="progressMessage" data-i18n="app.preparing">准备中...</p>
                                 <div class="progress-bar-wrapper">
                                     <div class="progress-bar">
                                         <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
@@ -250,12 +256,12 @@
                                     <path d="M16 24l6 6 10-12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
                             </div>
-                            <h3 class="result-title">压缩完成</h3>
+                            <h3 class="result-title" data-i18n="app.compressionComplete">压缩完成</h3>
                         </div>
 
                         <div class="result-comparison">
                             <div class="compare-side compare-before">
-                                <span class="compare-label">压缩前</span>
+                                <span class="compare-label" data-i18n="result.originalSize">压缩前</span>
                                 <span class="compare-value" id="originalSize">20.0 MB</span>
                             </div>
                             <div class="compare-arrow">
@@ -264,11 +270,11 @@
                                 </svg>
                             </div>
                             <div class="compare-side compare-after">
-                                <span class="compare-label">压缩后</span>
+                                <span class="compare-label" data-i18n="result.compressedSize">压缩后</span>
                                 <span class="compare-value" id="compressedSize">2.1 MB</span>
                             </div>
                             <div class="compare-side compare-ratio">
-                                <span class="compare-label">节省</span>
+                                <span class="compare-label" data-i18n="result.saved">节省</span>
                                 <span class="compare-value compare-highlight" id="compressionRatio">89.5%</span>
                             </div>
                         </div>
@@ -286,18 +292,18 @@
                                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                                     <path d="M10 3v10M6 9l4 4 4-4M3 15v2h14v-2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
-                                下载压缩文件
+                                <span data-i18n="app.download">下载压缩文件</span>
                             </a>
                             <button class="btn-ghost" id="btnRestart">
                                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                                     <path d="M3 10a7 7 0 0 1 13.4-2.8M17 10a7 7 0 0 1-13.4 2.8" stroke-linecap="round"/>
                                     <path d="M16.4 3v4.2h-4.2M3.6 17v-4.2h4.2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
-                                压缩其他文件
+                                <span data-i18n="app.restart">压缩其他文件</span>
                             </button>
                         </div>
 
-                        <p class="result-footnote">压缩文件将在 5 分钟后自动清理</p>
+                        <p class="result-footnote" data-i18n="result.cleanupNote">压缩文件将在 {{ cleanup_minutes | default(5) }} 分钟后自动清理</p>
                     </div>
 
                     <!-- 错误 -->
@@ -309,14 +315,14 @@
                                     <path d="M18 18l12 12M30 18L18 30" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
                                 </svg>
                             </div>
-                            <h3 class="error-title">压缩失败</h3>
-                            <p class="error-message" id="errorMessage">未知错误</p>
+                            <h3 class="error-title" data-i18n="errors.title">压缩失败</h3>
+                            <p class="error-message" id="errorMessage" data-i18n="errors.unknown">未知错误</p>
                             <button class="btn-ghost" id="btnRetry">
                                 <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
                                     <path d="M3 10a7 7 0 0 1 13.4-2.8M17 10a7 7 0 0 1-13.4 2.8" stroke-linecap="round"/>
                                     <path d="M16.4 3v4.2h-4.2M3.6 17v-4.2h4.2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
-                                重新上传
+                                <span data-i18n="app.retry">重新上传</span>
                             </button>
                         </div>
                     </div>
@@ -329,9 +335,9 @@
             <div class="footer-inner">
                 <span>SlimPDF</span>
                 <span class="footer-dot">·</span>
-                <span>基于 Ghostscript 引擎</span>
+                <span data-i18n="app.footerEngine">基于 Ghostscript 引擎</span>
                 <span class="footer-dot">·</span>
-                <span>所有文件仅在本地处理</span>
+                <span data-i18n="app.footerLocal">所有文件仅在本地处理</span>
             </div>
         </footer>
     </div>

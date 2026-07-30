@@ -18,6 +18,12 @@ block_cipher = None
 # Project root directory (SPECPATH is a PyInstaller built-in variable pointing to spec file dir)
 PROJECT_DIR = SPECPATH
 
+# Read version from the single source of truth (__version__.py)
+_version_ns = {}
+with open(os.path.join(PROJECT_DIR, '__version__.py'), encoding='utf-8') as _f:
+    exec(_f.read(), _version_ns)
+APP_VERSION = _version_ns['__version__']
+
 # ========== Data Files ==========
 datas = [
     (os.path.join(PROJECT_DIR, 'templates'), 'templates'),
@@ -143,8 +149,8 @@ if system == 'Darwin':
         bundle_identifier='com.tools.pdfcompressor',
         info_plist={
             'NSHighResolutionCapable': True,
-            'CFBundleShortVersionString': '1.0.0',
-            'CFBundleVersion': '1',
+            'CFBundleShortVersionString': APP_VERSION,
+            'CFBundleVersion': APP_VERSION,
             'NSHumanReadableCopyright': 'SlimPDF',
             'CFBundleDisplayName': 'SlimPDF',
         },

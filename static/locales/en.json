@@ -1,0 +1,70 @@
+{
+  "app": {
+    "docTitle": "SlimPDF - Professional PDF Compression Tool",
+    "badge": "Local processing · Privacy first",
+    "heroTitle": "Smart PDF Compression",
+    "heroDesc": "Powered by the professional Ghostscript engine, dramatically reduces file size while preserving visual quality",
+    "feature1": "Up to 90% compression",
+    "feature2": "Visually lossless",
+    "feature3": "Files never leave your device",
+    "step1": "Select File",
+    "step2": "Set Options",
+    "step3": "Done",
+    "dragDrop": "Drag PDF file here",
+    "clickSelect": "Click to select file",
+    "dropHint": "PDF format only, max {maxMB}MB",
+    "removeFile": "Remove file",
+    "qualityLabel": "Compression Quality",
+    "qualityLowName": "Light",
+    "qualityLowMeta": "High quality · Print-ready",
+    "qualityMediumName": "Balanced",
+    "qualityMediumMeta": "Quality / size balance",
+    "qualityHighName": "Maximum",
+    "qualityHighMeta": "Smallest file size",
+    "recommended": "Recommended",
+    "startCompression": "Start Compression",
+    "uploading": "Uploading...",
+    "compressing": "Compressing...",
+    "preparing": "Preparing...",
+    "compressionComplete": "Compression Complete",
+    "download": "Download Compressed File",
+    "restart": "Compress Another File",
+    "retry": "Re-upload",
+    "footerEngine": "Powered by Ghostscript",
+    "footerLocal": "All files processed locally"
+  },
+  "theme": {
+    "dark": "Dark mode",
+    "light": "Light mode",
+    "system": "Follow system"
+  },
+  "errors": {
+    "title": "Compression Failed",
+    "unknown": "Unknown error",
+    "noFile": "No file selected",
+    "onlyPdf": "Only PDF format files are supported",
+    "fileTooLarge": "File too large, max supported {maxMB}MB",
+    "uploadFailed": "File upload failed, please try again",
+    "missingFileId": "Please upload a file first",
+    "fileNotFound": "Uploaded file not found, please re-upload",
+    "startCompressionFailed": "Failed to start compression, please try again",
+    "compressionFailed": "Compression failed",
+    "ghostscriptNotFound": "Ghostscript not installed. Compression is unavailable.",
+    "connectionInterrupted": "Connection interrupted. Please refresh the page and try again.",
+    "serverUnreachable": "Server unreachable. Please check if the application is running.",
+    "invalidRequest": "Invalid request data"
+  },
+  "progress": {
+    "analyzing": "Analyzing PDF file...",
+    "starting": "Starting compression engine...",
+    "processing": "Processing...",
+    "page": "Compressing page {current}/{total}..."
+  },
+  "result": {
+    "originalSize": "Original",
+    "compressedSize": "Compressed",
+    "saved": "Saved",
+    "warning": "File already highly optimized, cannot compress further",
+    "cleanupNote": "Compressed files will be auto-cleaned after {minutes} minutes"
+  }
+}

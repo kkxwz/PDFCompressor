@@ -3,10 +3,11 @@ File Upload Routes
 """
 import os
 import uuid
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, Response, request, jsonify
 from werkzeug.utils import secure_filename
 
 import config
+from utils import format_size
 
 upload_bp = Blueprint("upload", __name__)
 
@@ -17,20 +18,8 @@ def allowed_file(filename: str) -> bool:
            filename.rsplit(".", 1)[1].lower() in config.ALLOWED_EXTENSIONS
 
 
-def format_size(size_bytes: int) -> str:
-    """Format file size"""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1024 * 1024:
-        return f"{size_bytes / 1024:.1f} KB"
-    elif size_bytes < 1024 * 1024 * 1024:
-        return f"{size_bytes / (1024 * 1024):.1f} MB"
-    else:
-        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
-
-
 @upload_bp.route("/api/upload", methods=["POST"])
-def upload_file():
+def upload_file() -> tuple[Response, int]:
     """Upload PDF file"""
     # Check if file exists in request
     if "file" not in request.files:
@@ -41,7 +30,7 @@ def upload_file():
 
     file = request.files["file"]
 
-    if file.filename == "":
+    if not file.filename:
         return jsonify({
             "error": "NO_FILE",
             "message": "No file selected"

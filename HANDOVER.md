@@ -4,24 +4,19 @@
 
 ---
 
-## 一、项目现状（2026-07-30）
+## 一、项目现状（2026-07-30 第二次更新）
 
 - **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。
-- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证。**注意：修复前 main 分支的压缩功能是完全坏的**（输出路径校验必失败 + SAFER 沙箱导致页数恒为 0），详见文末归档「2026-07-30 修复审计」。
-- **测试**：`pytest` 24/24 通过；测试已全部隔离到 `tmp_path`，不再污染真实 uploads/outputs 目录。
-- **CI**：`.github/workflows/build.yml` 已增加 `test` job（ubuntu + Python 3.12 + pytest），macOS/Windows 打包 job 均以其为前置；tag `v*` 触发发布。
+- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；原待办清单 9 项已全部处理完毕（详见文末归档「2026-07-30 待办清单九项集中处理」）。
+- **国际化**：前端已接入 zh/en 双语切换（语言包在 `static/locales/`，顶栏有切换按钮，localStorage 持久化，默认跟随浏览器语言）。
+- **测试**：`pytest` 31/31 通过（新增 health 缓存 3 例 + utils.format_size 4 例）；`mypy`（strict）全量通过。
+- **CI**：`.github/workflows/build.yml` 含 test（前置门禁）+ macOS + Windows x64 + Windows arm64 四个 job；tag `v*` 触发发布；依赖统一从 `requirements.lock` 安装。
 
 ## 二、待办事项
 
-- [ ] locales 国际化接入或删除：`locales/en.json`、`zh.json` 目前是死资源（全仓库无引用），且 HTML 中文文案与 JS 英文提示混杂
-- [ ] 版本号统一：`__version__.py`（无人 import）、`pyproject.toml` L7、`build.spec` info_plist 三处各自硬编码 1.0.0
-- [ ] 依赖锁定：requirements.txt 仅范围约束，无 lock 文件
-- [ ] mypy strict 补齐：pyproject 配置了 strict，但 routes/app.py 视图基本无类型注解，跑不过
-- [ ] 日志落盘：桌面 frozen 模式仅控制台日志，用户侧问题无法排查
-- [ ] health 接口缓存：每次请求都探测文件系统 + 起子进程取 gs 版本
-- [ ] `format_size` 前后端重复实现；100MB 上限在 config/JS/HTML 三处硬编码
-- [ ] Windows arm64：config.py 与 build.spec 有 arm64 分支，CI 无对应构建 job
-- [ ] README 仓库链接指向 `kkxwz/PDFCompressor`，需确认与实际仓库是否一致
+- [ ] Windows arm64 CI job 未经真实 tag 触发验证（`windows-11-arm` runner + choco 安装链路纸面可行，首次发版时需盯一下）
+- [ ] 测试缺口：`compress_pdf` 主流程、`task_manager` 模块仍无单元测试
+- [ ] 后端 SSE stage_message 仍输出英文，前端靠正则映射成当前语言（`localizeProgressMessage`）；若后端消息文案变动需同步前端正则
 
 ## 三、环境陷阱（必读）
 
@@ -33,26 +28,35 @@
 6. **macOS Monterey+ 5000 端口被 AirPlay Receiver 占用**：可用 `SLIMPDF_PORT` 环境变量换端口。
 7. **本地 `vendor/ghostscript/mac/gs` 若存在会优先于系统 PATH 被找到**：mock `find_ghostscript` 相关测试时须先 monkeypatch `config.GS_PATHS`。
 8. **build.spec 用 `SPECPATH` 取项目根目录**，不要改回 `os.getcwd()`。
+9. **health 探测有模块级缓存**（成功永久缓存、失败 30s TTL）：测试 health 时必须先 monkeypatch 重置 `routes.health._probe_cache` 与 `_probe_failed_at`（参考 tests/test_health.py 的 fixture）。
+10. **版本号只改 `__version__.py` 一处**：pyproject（dynamic attr）、build.spec（exec 读取）、config.VERSION、health 接口、页面 data 属性均自动跟随。
+11. **上传上限只改 `config.MAX_UPLOAD_MB` 一处**：后端限制、413 文案、HTML 提示、JS 校验均由模板注入（body data-* 属性）派生。
 
 ## 四、代码索引
 
 | 文件 | 职责 | 关键点 |
 |------|------|--------|
-| `app.py` | 入口，create_app + 主程序块 | 413 JSON 错误处理器；启动时清理残留文件 + atexit 清理 |
-| `config.py` | 全局配置，frozen/开发双环境路径 | `SLIMPDF_HOST`/`SLIMPDF_PORT` 环境变量；清理 5min、压缩超时 5min、上限 100MB |
+| `app.py` | 入口，create_app + 主程序块 | 413 JSON 错误处理器；启动清理残留 + atexit 清理；frozen 模式日志落盘 APP_DIR/logs（RotatingFileHandler 1MB×3）；index 注入 max_upload_mb/cleanup_minutes/version |
+| `config.py` | 全局配置，frozen/开发双环境路径 | `SLIMPDF_HOST`/`SLIMPDF_PORT` 环境变量；`VERSION`（源自 \_\_version\_\_.py）；`MAX_UPLOAD_MB` 单一来源 |
+| `__version__.py` | 版本号唯一来源 | pyproject dynamic + build.spec exec + config 均读此处 |
+| `utils.py` | 后端共享工具 | `format_size` 唯一后端实现 |
 | `routes/upload.py` | POST /api/upload | 扩展名白名单 + `%PDF-` magic bytes 双重校验；uuid + secure_filename 落盘 |
 | `routes/compress.py` | /api/compress、/api/progress(SSE)、/api/download | `_UUID_RE` 校验 file_id 防 glob 注入；SSE 有硬截止时间（压缩超时+60s）+ 15s 心跳 |
-| `routes/health.py` | /api/health | 每次实时探测 gs（无缓存，见待办） |
-| `compress/engine.py` | Ghostscript 调用核心 | 单管道 + `_drain_output` 线程；`_validate_pdf_path`（输入，须存在）与 `_validate_output_path`（输出，仅校验目录）分离；`--permit-file-read` |
+| `routes/health.py` | /api/health | 探测结果缓存（成功永久、失败 30s TTL）；返回应用版本号 |
+| `compress/engine.py` | Ghostscript 调用核心 | 单管道 + `_drain_output` 线程；`_validate_pdf_path`（输入）与 `_validate_output_path`（输出）分离；`--permit-file-read` |
 | `compress/task_manager.py` | 任务字典 + 线程池(4) + 清理线程 | 清理跳过 PENDING/PROCESSING，僵死任务宽限期 = 清理时长 + 压缩超时 |
 | `compress/profiles.py` | low/medium/high 三档 gs 参数 | 纯数据 |
-| `static/js/app.js` | 前端逻辑 | EventSource 接 SSE；断线用 HEAD /api/download 探测后重连 |
-| `tests/` | 24 个用例 | 全部 tmp_path 隔离；缺口：compress_pdf 主流程、task_manager 模块无测试 |
+| `static/js/app.js` | 前端逻辑 | i18n 运行时（t()/applyI18n/错误码映射/SSE 消息本地化）；EventSource 接 SSE；配置读自 body data-* 属性 |
+| `static/locales/zh.json`、`en.json` | 双语语言包 | key 集合必须保持一致；`{maxMB}`/`{minutes}`/`{current}`/`{total}` 占位符插值 |
+| `templates/index.html` | 页面结构 | 文案元素均挂 `data-i18n`/`data-i18n-title`；body data-* 注入后端配置 |
+| `requirements.lock` | 锁定依赖版本 | CI 全部 job 从此安装；改 requirements.txt 后需重新生成 |
+| `tests/` | 31 个用例 | 全部 tmp_path/monkeypatch 隔离；缺口：compress_pdf 主流程、task_manager 模块无测试 |
 
 ## 五、常用命令
 
 ```bash
-python3 -m pytest                 # 全量测试
+python3 -m pytest                 # 全量测试（31 用例）
+python3 -m mypy                   # 类型检查（strict，files 已在 pyproject 配置）
 python3 app.py                    # 本地运行（默认 127.0.0.1:5000）
 SLIMPDF_PORT=5050 python3 app.py  # 换端口运行
 bash scripts/build_mac.sh         # 本地打包 macOS
@@ -63,6 +67,46 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 # ⛔ 停止标识
 
 > 以下为历史归档，可在 token 清理时安全截断。按时间倒序排列（最新在前）。
+
+---
+
+## ✅ 已完成：2026-07-30 待办清单九项集中处理
+
+### 原始待办清单（处理结果）
+
+1. ✅ locales 死资源 → 已接入国际化：语言包迁至 `static/locales/`（zh/en），前端运行时切换（顶栏按钮 + localStorage 持久化 + 默认跟随浏览器语言），旧 `locales/` 目录已删除
+2. ✅ 版本号四处不一致 → 收敛为单一来源 `__version__.py`：pyproject `dynamic = ["version"]`、build.spec exec 读取、`config.VERSION`、health 接口与页面 data 属性均自动跟随
+3. ✅ 依赖未锁定 → 生成 `requirements.lock`（pip freeze），CI 全部 job 改从 lock 安装
+4. ✅ mypy strict 未通过 → 全量类型注解补齐（app/config/utils/routes/compress），`Success: no issues found in 12 source files`；`[tool.mypy] files` 已在 pyproject 配置
+5. ✅ frozen 模式日志不落盘 → `app.py:_setup_logging()`：打包运行时 RotatingFileHandler（1MB×3）写 APP_DIR/logs/slimpdf.log
+6. ✅ health 每次请求都探测 gs → 模块级缓存 + threading.Lock（成功永久缓存、失败 30s TTL），响应新增 `version` 字段
+7. ✅ format_size 两处重复、100MB 上限四处硬编码 → `utils.format_size` 唯一后端实现；`config.MAX_UPLOAD_MB` 单一来源，前端经模板 body data-* 属性派生
+8. ✅ CI 缺 Windows arm64 → 新增 `build-windows-arm64` job（`windows-11-arm` runner；捆绑 x64 Ghostscript，依赖 Windows-on-ARM x64 模拟，Artifex 无官方 arm64 gs）；产物重命名 SlimPDF-Windows-x64.exe / SlimPDF-Windows-arm64.exe 避免 release 冲突
+9. ✅ README 链接存疑 → 用户确认 `kkxwz/PDFCompressor` 地址无误，直接划掉
+
+### 实施内容（逐文件）
+
+- 新建：`utils.py`、`requirements.lock`、`static/locales/zh.json`、`static/locales/en.json`、`tests/test_health.py`（3 例）、`tests/test_utils.py`（4 例）
+- 删除：`locales/zh.json`、`locales/en.json`（死资源，已由 static/locales 取代）
+- `config.py`：VERSION / MAX_UPLOAD_MB 单一来源；`getattr(sys, "_MEIPASS")` 修 mypy
+- `pyproject.toml`：dynamic version + `[tool.setuptools.dynamic]` + mypy files
+- `build.spec`：exec 读 `__version__.py` 得 APP_VERSION，info_plist 使用
+- `app.py`：_setup_logging、413 handler 用 MAX_UPLOAD_MB、index 注入 max_upload_mb/cleanup_minutes/version
+- `routes/health.py`：探测缓存重写；`routes/upload.py`：format_size 改 import utils；`routes/compress.py`、`compress/*`：类型注解补齐（task_manager pop 显式 `Optional[Task]`）
+- `templates/index.html`：文案挂 `data-i18n`/`data-i18n-title`、语言切换按钮、body data-* 注入配置（弃用 `<script>` 内嵌 Jinja，避免 IDE lint 误报）
+- `static/js/app.js`：全量重写 i18n 运行时——`t()` 点号路径 + `{placeholder}` 插值、`applyI18n`、`setLanguage`、`ERROR_CODE_KEYS` 后端错误码映射、`localizeProgressMessage` 正则本地化 SSE 英文消息、上限读 `APP_CONFIG.maxUploadMB`
+- `static/css/style.css`：`.lang-toggle` 样式
+- `.github/workflows/build.yml`：lock 安装、arm64 job、exe 重命名、release 三产物
+
+### 验证结果
+
+- `pytest` 31/31 通过（新增 7 例）；`mypy` strict Success（12 文件）
+- zh/en 语言包 JSON 合法且 key 集合完全一致
+- 真实启动冒烟（SLIMPDF_PORT=5057）：body data-* 正确渲染（100/5/1.0.0）、`/api/health` 返回 version 且 gs 10.07.1 ok、两个 locale 文件均 200
+
+### 未处理遗留
+
+见文档前部「二、待办事项」（arm64 CI 未经真实发版验证、compress_pdf/task_manager 测试缺口、SSE 英文消息靠前端正则映射）。
 
 ---
 

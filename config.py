@@ -7,6 +7,11 @@ import os
 import sys
 import platform
 
+from __version__ import __version__
+
+# Single source of truth: __version__.py (pyproject/build.spec read the same file)
+VERSION = __version__
+
 # ========== Path Detection ==========
 
 def is_frozen() -> bool:
@@ -34,7 +39,7 @@ def get_app_dir() -> str:
 def get_resource_dir() -> str:
     """Get resource directory (templates/static/Ghostscript, read-only)"""
     if is_frozen():
-        return sys._MEIPASS
+        return str(getattr(sys, "_MEIPASS"))
     return os.path.dirname(os.path.abspath(__file__))
 
 
@@ -49,8 +54,10 @@ HOST = os.environ.get("SLIMPDF_HOST", "127.0.0.1")
 PORT = int(os.environ.get("SLIMPDF_PORT", "5000"))
 DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
-# Upload config
-MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB
+# Upload config (MAX_UPLOAD_MB is the single source; JS/HTML get it injected
+# via the index template, never hardcode the limit elsewhere)
+MAX_UPLOAD_MB = 100
+MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
 ALLOWED_EXTENSIONS = {"pdf"}
 UPLOAD_FOLDER = os.path.join(APP_DIR, "uploads")
 OUTPUT_FOLDER = os.path.join(APP_DIR, "outputs")
@@ -63,9 +70,9 @@ COMPRESS_TIMEOUT = 5 * 60  # 5 minutes
 
 # ========== Ghostscript Paths ==========
 
-def _build_gs_paths() -> list:
+def _build_gs_paths() -> list[str]:
     """Build Ghostscript executable search paths"""
-    paths = []
+    paths: list[str] = []
 
     if is_frozen():
         # Frozen mode: prefer bundled Ghostscript
