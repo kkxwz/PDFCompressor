@@ -8,7 +8,9 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import logging
+from collections import deque
 from typing import Callable, Optional
 
 import config
@@ -51,10 +53,22 @@ def _validate_pdf_path(path: str) -> bool:
     if not path.lower().endswith('.pdf'):
         return False
     # Prevent path traversal: ensure resolved path is within allowed directories
+    # (append os.sep so sibling dirs like "uploads_evil" cannot pass the check)
     real_path = os.path.realpath(path)
-    upload_dir = os.path.realpath(config.UPLOAD_FOLDER)
-    output_dir = os.path.realpath(config.OUTPUT_FOLDER)
-    return real_path.startswith(upload_dir) or real_path.startswith(output_dir)
+    for allowed in (config.UPLOAD_FOLDER, config.OUTPUT_FOLDER):
+        allowed_dir = os.path.realpath(allowed)
+        if real_path.startswith(allowed_dir + os.sep):
+            return True
+    return False
+
+
+def _validate_output_path(path: str) -> bool:
+    """Ensure output path is a .pdf inside the outputs directory
+    (unlike _validate_pdf_path, the file does not need to exist yet)"""
+    if not path.lower().endswith('.pdf'):
+        return False
+    real_dir = os.path.realpath(os.path.dirname(path))
+    return real_dir == os.path.realpath(config.OUTPUT_FOLDER)
 
 
 def _build_gs_command(gs_path: str, input_path: str, output_path: str,
@@ -183,11 +197,18 @@ def _parse_progress(line: str, total_pages: int) -> Optional[int]:
 def _get_total_pages(gs_path: str, input_path: str) -> int:
     """Get total PDF page count"""
     try:
+        # Escape PostScript string delimiters in path (defense in depth;
+        # server-generated names normally contain no parentheses/backslashes)
+        ps_path = input_path.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
         cmd = [
             gs_path,
             "-q", "-dNODISPLAY", "-dBATCH", "-dNOPAUSE",
+            # gs >= 9.50 runs SAFER by default; grant read access to the
+            # input file only, otherwise the PostScript file operator fails
+            # with /invalidfileaccess and page count silently becomes 0
+            f"--permit-file-read={input_path}",
             "-c",
-            f"({input_path}) (r) file runpdfbegin pdfpagecount = quit"
+            f"({ps_path}) (r) file runpdfbegin pdfpagecount = quit"
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         output = result.stdout.strip()
@@ -254,8 +275,8 @@ def compress_pdf(
             "error": "Invalid file path"
         }
 
-    # Validate output path security
-    if not _validate_pdf_path(output_path):
+    # Validate output path security (output file does not exist yet)
+    if not _validate_output_path(output_path):
         return {
             "success": False,
             "error": "Invalid output path"
@@ -277,41 +298,50 @@ def compress_pdf(
     logger.info(f"Executing command: {' '.join(cmd)}")
 
     try:
-        # Execute Ghostscript
+        # Execute Ghostscript. Progress lines ("Page N") are printed on stdout,
+        # so merge stderr into stdout and read a single pipe.
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True
         )
 
-        # Read output in real-time
-        current_progress = 10
-        for line in process.stderr:
-            line = line.strip()
-            if line:
+        # Keep the tail of output for error reporting
+        output_tail: deque = deque(maxlen=50)
+
+        def _drain_output():
+            """Drain output in a background thread (prevents pipe-buffer deadlock
+            and keeps process.wait(timeout=...) effective)"""
+            current_progress = 10
+            for raw_line in process.stdout:
+                line = raw_line.strip()
+                if not line:
+                    continue
+                output_tail.append(line)
                 progress = _parse_progress(line, total_pages)
                 if progress is not None and progress > current_progress:
                     current_progress = progress
                     if total_pages > 0:
                         # Extract current page from line
                         match = re.search(r"Page (\d+)", line)
-                        if match:
-                            page_num = match.group(1)
-                            if progress_callback:
-                                progress_callback(
-                                    current_progress,
-                                    f"Compressing page {page_num}/{total_pages}..."
-                                )
-                    else:
-                        if progress_callback:
-                            progress_callback(current_progress, "Compressing...")
+                        if match and progress_callback:
+                            progress_callback(
+                                current_progress,
+                                f"Compressing page {match.group(1)}/{total_pages}..."
+                            )
+                    elif progress_callback:
+                        progress_callback(current_progress, "Compressing...")
 
-        # Wait for completion
+        reader = threading.Thread(target=_drain_output, daemon=True)
+        reader.start()
+
+        # Wait for completion (real timeout: the reader thread keeps the pipe drained)
         process.wait(timeout=timeout)
+        reader.join(timeout=5)
 
         if process.returncode != 0:
-            stderr_output = process.stderr.read() if process.stderr else ""
+            stderr_output = "\n".join(output_tail)
             return {
                 "success": False,
                 "error": f"Ghostscript failed (code={process.returncode}): {stderr_output}"
@@ -319,6 +349,7 @@ def compress_pdf(
 
     except subprocess.TimeoutExpired:
         process.kill()
+        process.wait()
         return {
             "success": False,
             "error": f"Compression timed out (exceeded {timeout}s). Try a smaller file or lower compression level."

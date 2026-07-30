@@ -2,6 +2,7 @@
 Compression Task Routes - Start compression, progress push, download result
 """
 import os
+import re
 import json
 import time
 import glob
@@ -12,9 +13,18 @@ from compress.task_manager import get_task_manager, TaskStatus
 
 compress_bp = Blueprint("compress", __name__)
 
+# file_id is server-generated uuid4; reject anything else before it reaches glob
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+)
+
 
 def _find_upload_file(file_id: str) -> tuple:
     """Find uploaded file by file_id, return (file_path, original_filename)"""
+    # Validate format first: prevents glob wildcards / path separators injection
+    if not _UUID_RE.match(file_id):
+        return None, None
+
     pattern = os.path.join(config.UPLOAD_FOLDER, f"{file_id}_*.pdf")
     matches = glob.glob(pattern)
     if not matches:
@@ -30,9 +40,12 @@ def _find_upload_file(file_id: str) -> tuple:
 @compress_bp.route("/api/compress", methods=["POST"])
 def start_compress():
     """Start compression task"""
-    data = request.get_json()
+    # silent=True: malformed JSON returns None instead of raising;
+    # explicit None check so an empty JSON object {} still reaches the
+    # MISSING_FILE_ID branch below
+    data = request.get_json(silent=True)
 
-    if not data:
+    if data is None:
         return jsonify({
             "error": "INVALID_REQUEST",
             "message": "Invalid request data"
@@ -93,6 +106,9 @@ def get_progress(task_id: str):
     def generate():
         """Generate SSE event stream"""
         last_progress = -1
+        # Hard deadline so the stream can never outlive a stuck task
+        deadline = time.time() + config.COMPRESS_TIMEOUT + 60
+        last_heartbeat = time.time()
 
         while True:
             current_progress = task.progress
@@ -114,10 +130,27 @@ def get_progress(task_id: str):
 
                 yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
                 last_progress = current_progress
+                last_heartbeat = time.time()
 
                 # End stream when task completes or fails
                 if current_status in (TaskStatus.DONE, TaskStatus.ERROR):
                     break
+
+            if time.time() > deadline:
+                data = {
+                    "stage": TaskStatus.ERROR,
+                    "progress": current_progress,
+                    "message": "",
+                    "error": "Task timed out. Please retry with a smaller file.",
+                }
+                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                break
+
+            # Periodic heartbeat: keeps proxies from buffering and lets the
+            # server detect client disconnects (GeneratorExit on yield)
+            if time.time() - last_heartbeat > 15:
+                yield ": heartbeat\n\n"
+                last_heartbeat = time.time()
 
             time.sleep(0.3)
 

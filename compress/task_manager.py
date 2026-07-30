@@ -161,11 +161,18 @@ class TaskManager:
         """Clean up expired tasks"""
         current_time = time.time()
         tasks_to_remove = []
+        # Active (pending/processing) tasks get an extra grace period of one
+        # compression timeout, so in-flight work is never deleted prematurely;
+        # only truly stuck tasks are reclaimed.
+        stale_seconds = config.FILE_CLEANUP_SECONDS + config.COMPRESS_TIMEOUT
 
         with self.lock:
             for task_id, task in self.tasks.items():
                 age = current_time - task.created_at
-                if age > config.FILE_CLEANUP_SECONDS:
+                if task.status in (TaskStatus.PENDING, TaskStatus.PROCESSING):
+                    if age > stale_seconds:
+                        tasks_to_remove.append(task_id)
+                elif age > config.FILE_CLEANUP_SECONDS:
                     tasks_to_remove.append(task_id)
 
             for task_id in tasks_to_remove:

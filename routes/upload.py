@@ -54,6 +54,15 @@ def upload_file():
             "message": "Only PDF format files are supported"
         }), 400
 
+    # Check PDF magic bytes (rejects renamed non-PDF files)
+    header = file.stream.read(5)
+    file.stream.seek(0)
+    if header != b"%PDF-":
+        return jsonify({
+            "error": "ONLY_PDF",
+            "message": "Only PDF format files are supported"
+        }), 400
+
     # Generate unique file ID
     file_id = str(uuid.uuid4())
     original_filename = secure_filename(file.filename)

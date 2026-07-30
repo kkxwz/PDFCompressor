@@ -43,9 +43,10 @@ def get_resource_dir() -> str:
 APP_DIR = get_app_dir()
 RESOURCE_DIR = get_resource_dir()
 
-# Server config
-HOST = "127.0.0.1"
-PORT = 5000
+# Server config (overridable via env vars; port 5000 conflicts with
+# AirPlay Receiver on macOS Monterey+)
+HOST = os.environ.get("SLIMPDF_HOST", "127.0.0.1")
+PORT = int(os.environ.get("SLIMPDF_PORT", "5000"))
 DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
 
 # Upload config

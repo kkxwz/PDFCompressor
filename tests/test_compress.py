@@ -3,31 +3,28 @@ import json
 import os
 import pytest
 from flask import Flask
-from unittest.mock import patch, MagicMock
 
 import config
-from routes.compress import compress_bp
+from routes.compress import compress_bp, _find_upload_file
 from routes.upload import upload_bp
 from compress.task_manager import TaskStatus
 
 
 @pytest.fixture
-def app():
-    """Create test Flask app."""
+def app(tmp_path, monkeypatch):
+    """Create test Flask app (isolated dirs, no real-data pollution)."""
+    upload_dir = tmp_path / "uploads"
+    output_dir = tmp_path / "outputs"
+    upload_dir.mkdir()
+    output_dir.mkdir()
+    monkeypatch.setattr(config, "UPLOAD_FOLDER", str(upload_dir))
+    monkeypatch.setattr(config, "OUTPUT_FOLDER", str(output_dir))
+
     app = Flask(__name__)
     app.config["TESTING"] = True
     app.register_blueprint(upload_bp)
     app.register_blueprint(compress_bp)
-    os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
-    os.makedirs(config.OUTPUT_FOLDER, exist_ok=True)
     yield app
-    # Cleanup
-    for folder in [config.UPLOAD_FOLDER, config.OUTPUT_FOLDER]:
-        for f in os.listdir(folder):
-            try:
-                os.remove(os.path.join(folder, f))
-            except OSError:
-                pass
 
 
 @pytest.fixture
@@ -78,3 +75,22 @@ def test_download_task_not_found(client):
     assert response.status_code == 404
     data = response.get_json()
     assert data["error"] == "TASK_NOT_FOUND"
+
+
+def test_find_upload_file_rejects_glob_injection(app):
+    """file_id with glob wildcards must not match any uploaded file."""
+    # Place a legitimately named upload in the folder
+    victim = os.path.join(config.UPLOAD_FOLDER,
+                          "12345678-1234-1234-1234-123456789abc_doc.pdf")
+    with open(victim, "wb") as f:
+        f.write(b"%PDF-1.4")
+
+    for malicious_id in ("*", "?", "[!a]", "../../etc", "12345678*"):
+        path, name = _find_upload_file(malicious_id)
+        assert path is None
+        assert name is None
+
+    # A well-formed uuid still resolves normally
+    path, name = _find_upload_file("12345678-1234-1234-1234-123456789abc")
+    assert path == victim
+    assert name == "doc.pdf"

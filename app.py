@@ -13,7 +13,7 @@ import webbrowser
 import threading
 import atexit
 
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 
 import config
 from routes.upload import upload_bp
@@ -51,6 +51,15 @@ def create_app() -> Flask:
     app.register_blueprint(upload_bp)
     app.register_blueprint(compress_bp)
     app.register_blueprint(health_bp)
+
+    # Return JSON (not Flask's default HTML page) when MAX_CONTENT_LENGTH is hit
+    @app.errorhandler(413)
+    def request_entity_too_large(e):
+        max_mb = config.MAX_CONTENT_LENGTH // (1024 * 1024)
+        return jsonify({
+            "error": "FILE_TOO_LARGE",
+            "message": f"File too large, max supported {max_mb}MB"
+        }), 413
 
     # Home route
     @app.route("/")
@@ -100,7 +109,9 @@ if __name__ == "__main__":
     else:
         logger.warning("Ghostscript not found! Compression unavailable.")
 
-    # Register exit cleanup
+    # Clean up files left over from a previous abnormal exit (atexit may not
+    # have run if the process was killed), then register exit cleanup
+    cleanup_temp_files()
     atexit.register(cleanup_temp_files)
 
     # Delayed browser open (auto-open in both frozen and production mode)
