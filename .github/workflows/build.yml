@@ -181,9 +181,15 @@ jobs:
       - name: Install Ghostscript
         shell: pwsh
         run: |
-          choco install ghostscript --no-progress -y
+          # chocolatey hangs on windows-11-arm (x64 emulation), so install
+          # directly from the official Artifex self-extracting installer.
+          # gs10071w64.exe is NSIS-based and honors /S for silent install.
+          $installer = "$env:RUNNER_TEMP\gs10071w64.exe"
+          Invoke-WebRequest -Uri "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10071/gs10071w64.exe" -OutFile $installer
+          Start-Process -FilePath $installer -ArgumentList "/S" -Wait
           $gsPath = (Get-Command gswin64c -ErrorAction SilentlyContinue).Source
           if (-not $gsPath) {
+            # Search common install paths
             $searchPaths = @(
               "C:\Program Files\gs\*\bin\gswin64c.exe",
               "C:\Program Files (x86)\gs\*\bin\gswin64c.exe"
