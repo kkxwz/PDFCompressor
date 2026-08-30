@@ -35,6 +35,7 @@
 15. **Linux frozen 数据目录已改为 XDG 规范**（`$XDG_DATA_HOME/SlimPDF` 或 `~/.local/share/SlimPDF`，替代旧 `~/.pdf-compressor`）；CI 从未发布 Linux 包，无存量迁移负担。
 16. **SSE 进度事件带 `meta` 结构字段**（`{"key": analyzing|processing|page|complete}`，page 附 `current`/`total`）：前端 `localizeProgressMessage` 优先用 meta，英文 `message` 仅作兼容兑底；新增进度阶段时必须同时产出 meta，并在前端 `META_KEY_TO_LOCALE` 登记。
 17. **`compress_pdf` 进度回调为三参** `(progress, message, meta=None)`：mock 该回调的测试/代码需用 `lambda p, m, meta=None` 签名；预发布 tag（含 `-`）不会触发 release job。
+18. **windows-11-arm runner 上 `choco install` 会无限挂起**（v1.1.0-rc.1 实测同一步骤 >25 分钟未完成，x64 上约 2 分钟）：arm64 job 已改为直下 Artifex 官方安装包 `gs10071w64.exe` 静默安装（`/S`），不要在 arm64 job 里再用 choco。
 
 ## 四、代码索引
 
@@ -89,6 +90,7 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 - SSE 结构化：`compress_pdf` 进度回调改三参 `(progress, message, meta)`，meta key 为 analyzing/processing/page/complete；`Task.stage_meta` 随 SSE `meta` 字段下发；前端 `localizeProgressMessage` 优先 meta（`META_KEY_TO_LOCALE`），英文正则保留作兼容兑底（待办第 3 项消除）
 - 【冒烟发现并修复】回退原文件早退分支未发完成事件 → done 事件 meta 残留 processing；已在该分支补 `progress_callback(100, ..., {"key": "complete"})` 并加回归断言（陷阱 16/17 的来源）
 - 版本与发布策略：`__version__.py` 1.0.1 → 1.1.0；release job 条件追加 `!contains(github.ref, '-')`，预发布 tag 只跑构建不发 Release，可安全验证 arm64 job
+- 【rc.1 实测发现】windows-11-arm 上 `choco install ghostscript` 无限挂起（>25 分钟，同步骤 x64 约 2 分钟）→ `0b9e02a` 将 arm64 job 改为直下官方 `gs10071w64.exe` 静默安装（`/S`），打 `v1.1.0-rc.2` 重新验证；rc.1 run 可在 GitHub UI 手动取消
 
 ### 验证结果（原始记录）
 
