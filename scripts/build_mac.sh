@@ -2,7 +2,7 @@
 # ============================================
 # SlimPDF - macOS Build Script
 # ============================================
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -15,6 +15,16 @@ echo "============================================"
 # 1. Check dependencies
 echo "[1/5] Checking dependencies..."
 python3 --version
+
+# Require Python >= 3.10 (project uses builtin generics / X|Y annotations)
+PY_VER=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+PY_MAJOR=${PY_VER%%.*}
+PY_MINOR=${PY_VER#*.}
+if [ "$PY_MAJOR" -lt 3 ] || { [ "$PY_MAJOR" -eq 3 ] && [ "$PY_MINOR" -lt 10 ]; }; then
+    echo "Error: Python >= 3.10 required (found $PY_VER)."
+    exit 1
+fi
+
 pip3 show pyinstaller >/dev/null 2>&1 || pip3 install pyinstaller
 
 # Check Ghostscript
@@ -34,13 +44,15 @@ mkdir -p "$VENDOR_GS"
 cp "$GS_PATH" "$VENDOR_GS/gs"
 chmod +x "$VENDOR_GS/gs"
 
-# If installed via Homebrew, try to create Universal Binary
-BREW_PREFIX=$(brew --prefix 2>/dev/null || echo "")
-if [ -n "$BREW_PREFIX" ]; then
-    GS_ARM="$BREW_PREFIX/bin/gs"
-    # Check for different architecture versions
-    if file "$GS_ARM" | grep -q "arm64"; then
-        echo "  Detected ARM64 version"
+# Copy Resource files (fonts etc.) when present next to the Homebrew install,
+# matching what CI does - otherwise the bundled gs may fail on font lookups
+GS_SHARE="$(dirname "$(dirname "$GS_PATH")")/share/ghostscript"
+if [ -d "$GS_SHARE" ]; then
+    GS_VER=$(ls "$GS_SHARE" | head -1)
+    if [ -d "$GS_SHARE/$GS_VER/Resource" ]; then
+        mkdir -p "$VENDOR_GS/share/$GS_VER"
+        cp -R "$GS_SHARE/$GS_VER/Resource" "$VENDOR_GS/share/$GS_VER/"
+        echo "  Copied Ghostscript Resource ($GS_VER)"
     fi
 fi
 echo "  Copied Ghostscript to vendor directory"

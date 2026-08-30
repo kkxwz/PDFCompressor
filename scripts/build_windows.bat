@@ -20,6 +20,19 @@ if errorlevel 1 (
     echo Error: Python not found. Please install Python 3.10+
     exit /b 1
 )
+
+REM Require Python >= 3.10 (project uses builtin generics / X^|Y annotations)
+for /f "tokens=2" %%V in ('python --version 2^>^&1') do set "PY_VER=%%V"
+for /f "tokens=1,2 delims=." %%A in ("%PY_VER%") do (
+    if %%A LSS 3 goto :py_too_old
+    if %%A EQU 3 if %%B LSS 10 goto :py_too_old
+)
+goto :py_ok
+:py_too_old
+echo Error: Python ^>= 3.10 required ^(found %PY_VER%^).
+exit /b 1
+:py_ok
+
 pip show pyinstaller >nul 2>&1
 if errorlevel 1 (
     echo Installing PyInstaller...

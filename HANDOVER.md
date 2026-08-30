@@ -4,18 +4,19 @@
 
 ---
 
-## 一、项目现状（2026-07-30 第二次更新）
+## 一、项目现状（2026-08-30 第三次更新）
 
 - **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。
-- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；原待办清单 9 项已全部处理完毕（详见文末归档「2026-07-30 待办清单九项集中处理」）。
+- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；2026-08-30 完成全方位安全加固与跨平台兼容性增强（详见文末归档「2026-08-30 安全加固与兼容性增强」）：CSRF 防护、安全响应头、上传/压缩限流、异常行为审计日志、目录私有权限、Windows 编码容错均已落地并回归验证。
 - **国际化**：前端已接入 zh/en 双语切换（语言包在 `static/locales/`，顶栏有切换按钮，localStorage 持久化，默认跟随浏览器语言）。
-- **测试**：`pytest` 31/31 通过（新增 health 缓存 3 例 + utils.format_size 4 例）；`mypy`（strict）全量通过。
-- **CI**：`.github/workflows/build.yml` 含 test（前置门禁）+ macOS + Windows x64 + Windows arm64 四个 job；tag `v*` 触发发布；依赖统一从 `requirements.lock` 安装。
+- **测试**：`pytest` 43/43 通过（新增 test_security.py 12 例）；`mypy`（strict）全量通过（13 文件）。
+- **CI**：`.github/workflows/build.yml` 含 test（前置门禁，**Python 3.10/3.11/3.12/3.13 矩阵**）+ macOS + Windows x64 + Windows arm64 四个 job；tag `v*` 触发发布；依赖统一从 `requirements.lock` 安装（已审计无已知 CVE：Flask 3.1.3 / Werkzeug 3.1.8 / Jinja2 3.1.6 均为各自最新修复版本）。
+- **依赖审计结论（2026-08-30）**：无数据库 → 无 SQL 注入面；Jinja2 自动转义 + 前端全部走 textContent → 无 XSS 注入点；CSP/nosniff/X-Frame-Options 为纵深防御。
 
 ## 二、待办事项
 
 - [ ] Windows arm64 CI job 未经真实 tag 触发验证（`windows-11-arm` runner + choco 安装链路纸面可行，首次发版时需盯一下）
-- [ ] 测试缺口：`compress_pdf` 主流程、`task_manager` 模块仍无单元测试
+- [ ] 测试缺口：`compress_pdf` 主流程、`task_manager` 模块仍无单元测试（安全面已由 test_security.py 覆盖）
 - [ ] 后端 SSE stage_message 仍输出英文，前端靠正则映射成当前语言（`localizeProgressMessage`）；若后端消息文案变动需同步前端正则
 
 ## 三、环境陷阱（必读）
@@ -31,26 +32,31 @@
 9. **health 探测有模块级缓存**（成功永久缓存、失败 30s TTL）：测试 health 时必须先 monkeypatch 重置 `routes.health._probe_cache` 与 `_probe_failed_at`（参考 tests/test_health.py 的 fixture）。
 10. **版本号只改 `__version__.py` 一处**：pyproject（dynamic attr）、build.spec（exec 读取）、config.VERSION、health 接口、页面 data 属性均自动跟随。
 11. **上传上限只改 `config.MAX_UPLOAD_MB` 一处**：后端限制、413 文案、HTML 提示、JS 校验均由模板注入（body data-* 属性）派生。
+12. **CSRF 防护基于自定义头**：所有状态变更请求（POST）必须携带 `X-Requested-With: XMLHttpRequest`，否则 403 `CSRF_REJECTED`。用 curl/测试客户端手工调 POST 接口、或新增 POST 路由的测试时必须带此头；新增前端 fetch 调用记得合入 `API_HEADERS`。
+13. **上传/压缩接口有限流**（默认 60/20 次每分钟每 IP，超限 429 `RATE_LIMITED`）：限流器是模块级单例（`routes.upload._upload_limiter` / `routes.compress._compress_limiter`），高频调用同接口的测试须先 monkeypatch 替换（参考 tests/test_security.py fixture）。
+14. **安全审计日志走 `slimpdf.security` logger**：CSRF 拒绝、限流命中、非法 file_id/task_id、非法扩展名/魔数上传、非回环绑定均记录于此；排查异常行为时按该 logger 名过滤。
+15. **Linux frozen 数据目录已改为 XDG 规范**（`$XDG_DATA_HOME/SlimPDF` 或 `~/.local/share/SlimPDF`，替代旧 `~/.pdf-compressor`）；CI 从未发布 Linux 包，无存量迁移负担。
 
 ## 四、代码索引
 
 | 文件 | 职责 | 关键点 |
 |------|------|--------|
-| `app.py` | 入口，create_app + 主程序块 | 413 JSON 错误处理器；启动清理残留 + atexit 清理；frozen 模式日志落盘 APP_DIR/logs（RotatingFileHandler 1MB×3）；index 注入 max_upload_mb/cleanup_minutes/version |
-| `config.py` | 全局配置，frozen/开发双环境路径 | `SLIMPDF_HOST`/`SLIMPDF_PORT` 环境变量；`VERSION`（源自 \_\_version\_\_.py）；`MAX_UPLOAD_MB` 单一来源 |
+| `app.py` | 入口，create_app + 主程序块 | 413/429 JSON 错误处理器；CSRF before_request 钩子；安全响应头 after_request（CSP/nosniff/X-Frame-Options/Referrer-Policy）；启动清理残留 + atexit 清理；非回环绑定告警；frozen 模式日志落盘 APP_DIR/logs（RotatingFileHandler 1MB×3） |
+| `security.py` | 安全中间件 | `check_csrf`（自定义头防护）、`RateLimiter`（固定窗口、线程安全）、`security_logger` 审计日志、`reject_rate_limited` 429 构造 |
+| `config.py` | 全局配置，frozen/开发双环境路径 | `SLIMPDF_HOST`/`SLIMPDF_PORT` 环境变量；`VERSION`（源自 \_\_version\_\_.py）；`MAX_UPLOAD_MB` 单一来源；`RATE_LIMIT_*` 限流参数；`ensure_private_dir`（POSIX 0o700）；Linux XDG 数据目录 |
 | `__version__.py` | 版本号唯一来源 | pyproject dynamic + build.spec exec + config 均读此处 |
 | `utils.py` | 后端共享工具 | `format_size` 唯一后端实现 |
-| `routes/upload.py` | POST /api/upload | 扩展名白名单 + `%PDF-` magic bytes 双重校验；uuid + secure_filename 落盘 |
-| `routes/compress.py` | /api/compress、/api/progress(SSE)、/api/download | `_UUID_RE` 校验 file_id 防 glob 注入；SSE 有硬截止时间（压缩超时+60s）+ 15s 心跳 |
+| `routes/upload.py` | POST /api/upload | 扩展名白名单 + `%PDF-` magic bytes 双重校验；拒绝事件写审计日志；限流 60 次/分钟 |
+| `routes/compress.py` | /api/compress、/api/progress(SSE)、/api/download | `_UUID_RE` 同时校验 file_id 与 task_id（progress/download 也防路径穿越）；SSE 硬截止时间 + 15s 心跳；限流 20 次/分钟 |
 | `routes/health.py` | /api/health | 探测结果缓存（成功永久、失败 30s TTL）；返回应用版本号 |
-| `compress/engine.py` | Ghostscript 调用核心 | 单管道 + `_drain_output` 线程；`_validate_pdf_path`（输入）与 `_validate_output_path`（输出）分离；`--permit-file-read` |
+| `compress/engine.py` | Ghostscript 调用核心 | 单管道 + `_drain_output` 线程；路径校验分离；`--permit-file-read`；页数探测显式 `-dSAFER`（兼容旧版 gs）；子进程解码 `errors="replace"`（Windows 编码容错） |
 | `compress/task_manager.py` | 任务字典 + 线程池(4) + 清理线程 | 清理跳过 PENDING/PROCESSING，僵死任务宽限期 = 清理时长 + 压缩超时 |
 | `compress/profiles.py` | low/medium/high 三档 gs 参数 | 纯数据 |
-| `static/js/app.js` | 前端逻辑 | i18n 运行时（t()/applyI18n/错误码映射/SSE 消息本地化）；EventSource 接 SSE；配置读自 body data-* 属性 |
-| `static/locales/zh.json`、`en.json` | 双语语言包 | key 集合必须保持一致；`{maxMB}`/`{minutes}`/`{current}`/`{total}` 占位符插值 |
+| `static/js/app.js` | 前端逻辑 | i18n 运行时；`API_HEADERS`（X-Requested-With）随所有 fetch；`RATE_LIMITED`/`CSRF_REJECTED` 错误码映射 |
+| `static/locales/zh.json`、`en.json` | 双语语言包 | key 集合必须保持一致；含 `errors.rateLimited` |
 | `templates/index.html` | 页面结构 | 文案元素均挂 `data-i18n`/`data-i18n-title`；body data-* 注入后端配置 |
-| `requirements.lock` | 锁定依赖版本 | CI 全部 job 从此安装；改 requirements.txt 后需重新生成 |
-| `tests/` | 31 个用例 | 全部 tmp_path/monkeypatch 隔离；缺口：compress_pdf 主流程、task_manager 模块无测试 |
+| `requirements.lock` | 锁定依赖版本 | CI 全部 job 从此安装；已审计无已知 CVE（Flask 3.1.3/Werkzeug 3.1.8/Jinja2 3.1.6） |
+| `tests/` | 43 个用例 | 全部 tmp_path/monkeypatch 隔离；含 test_security.py（CSRF/安全头/限流/非法 task_id）；缺口：compress_pdf 主流程、task_manager 模块无测试 |
 
 ## 五、常用命令
 
@@ -67,6 +73,50 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 # ⛔ 停止标识
 
 > 以下为历史归档，可在 token 清理时安全截断。按时间倒序排列（最新在前）。
+
+---
+
+## ✅ 已完成：2026-08-30 全方位安全加固与跨平台兼容性增强
+
+### 背景与需求（原始记录）
+
+用户要求：① 安全面——审查修复潜在漏洞（SQL 注入/XSS/CSRF）、文件上传安全、异常行为日志追踪、依赖库风险检查；② 兼容面——主流 OS、Python 版本与浏览器兼容、跨平台路径处理、构建脚本稳定性。处理方式：逐项对照源码审计（多数防护已存在，补齐缺口）→ 实施 → 全量回归 + 真实启动冒烟。
+
+### 审计结论（原始记录）
+
+1. **SQL 注入**：项目无任何数据库/ORM，无注入面，无需修复。
+2. **XSS**：Jinja2 自动转义开启（默认）；前端所有动态内容均走 `textContent`/属性赋值，无 `innerHTML` 拼接外部数据 → 无注入点。仍补 CSP 等响应头作纵深防御。
+3. **CSRF**：原无防护 → 本次新增自定义头防护（见下）。恶意网页的 HTML 表单无法设置自定义头，跨源 fetch 带自定义头会触发 CORS 预检而本服务从不返回 CORS 头 → 伪造请求被阻断。
+4. **上传安全**：扩展名白名单 + `%PDF-` 魔数 + `secure_filename` + uuid 命名已完备；本次补目录 0o700 权限与拒绝事件审计。
+5. **依赖风险**：Flask 3.1.3（CVE-2025-47278 已在 3.1.1 修复）、Werkzeug 3.1.8（2026-04-02 最新版，CVE-2024-34069/49766/49767 及后续修复均已含）、Jinja2 3.1.6（CVE-2025-27516 修复版）、MarkupSafe 3.0.3/click 8.4.2/blinker 1.9.0/itsdangerous 2.2.0 均为最新 → 无已知 CVE，lock 无需重生成。
+6. **跨平台**：路径处理全部 `os.path.join`/`os.path.realpath`，无硬编码分隔符；发现的真实缺口：Windows 下 gs 输出用区域编码（cp936/cp1252）可能解码崩溃、旧版 gs 页数探测无显式沙箱、Linux 数据目录不符合 XDG、CI 只测单一 Python 版本、构建脚本无 Python 版本门槛。
+7. **浏览器兼容**：前端仅用 fetch/EventSource/localStorage/matchMedia 等现代浏览器标配 API，无兼容风险项。
+
+### 实施内容（逐文件）
+
+- 新建：`security.py`（`check_csrf` 自定义头防护、线程安全固定窗口 `RateLimiter`、`slimpdf.security` 审计 logger、`reject_rate_limited`）、`tests/test_security.py`（12 例）
+- `app.py`：CSRF before_request 钩子；安全响应头 after_request（CSP default-src 'self' + frame-ancestors 'none'、nosniff、X-Frame-Options DENY、no-referrer）；429 JSON 错误处理器；非回环绑定启动告警（双写安全日志）；目录创建改 `ensure_private_dir`
+- `config.py`：`RATE_LIMIT_UPLOAD/COMPRESS/WINDOW_SECONDS` 参数；`ensure_private_dir`（POSIX chmod 0o700，Windows no-op）；Linux frozen 目录改 XDG（`$XDG_DATA_HOME/SlimPDF` 或 `~/.local/share/SlimPDF`）
+- `routes/upload.py`：上传限流（60/分钟）；非法扩展名/魔数拒绝写审计日志（文件名截断 80 字符防日志膨胀）
+- `routes/compress.py`：压缩限流（20/分钟）；`_UUID_RE` 校验扩展到 progress/download 的 task_id（防路径穿越/非法格式）；非法 level/file_id 审计日志；429 构造走 security 模块
+- `compress/engine.py`：页数探测显式 `-dSAFER`（旧版 gs 沙箱兼容）；三处子进程解码加 `errors="replace"`（Windows 区域编码容错，不再因乱码中断压缩）
+- `static/js/app.js`：`API_HEADERS` 常量随所有 fetch 携带 `X-Requested-With`；`ERROR_CODE_KEYS` 新增 `RATE_LIMITED`/`CSRF_REJECTED` 映射
+- `static/locales/zh.json`、`en.json`：新增 `errors.rateLimited`（key 集合保持一致）
+- `scripts/build_mac.sh`：`set -euo pipefail`；Python ≥ 3.10 门槛校验；删除无用的 universal binary 探测，改为与 CI 一致的 gs Resource 拷贝（本地打包不再缺字体）
+- `scripts/build_windows.bat`：Python ≥ 3.10 门槛校验（解析 `python --version`）
+- `.github/workflows/build.yml`：test job 扩展为 Python 3.10/3.11/3.12/3.13 矩阵（fail-fast: false）
+- `pyproject.toml`：mypy files 新增 `security.py`
+
+### 验证结果（原始记录）
+
+- `pytest` 43/43 通过（存量 31 + 新增 12）；`mypy` strict Success（13 文件）
+- 真实启动冒烟（SLIMPDF_PORT=5059，gs 10.07.1）：四个安全响应头均在 / 返回；无头 POST → 403 CSRF_REJECTED；带头 → 正常业务分支；真实上传 200；端到端压缩 → SSE done（含「压缩变大回退原文件」分支）；`slimpdf.security` 日志如实记录 CSRF 拒绝与非法扩展名上传；`bash -n` 脚本语法、workflow YAML 均合法
+- 依赖审计：见上文结论第 5 条，无已知 CVE，lock 无需变更（本机环境 Flask/Werkzeug 版本低于 lock 不影响结论，CI 从 lock 安装）
+- 未在本机验证项（环境限制）：Windows/Linux 真实运行、CI 四版本矩阵、bat 脚本实机执行（已做逻辑复查）
+
+### 未处理遗留
+
+见文档前部「二、待办事项」（arm64 CI 未经真实发版验证、compress_pdf/task_manager 测试缺口、SSE 英文消息靠前端正则映射），另：Windows/Linux 实机与 CI 多版本矩阵待下次发版验证。
 
 ---
 

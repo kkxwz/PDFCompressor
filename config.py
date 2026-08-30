@@ -30,7 +30,13 @@ def get_app_dir() -> str:
             app_dir = os.path.join(os.path.expanduser("~"), "Library",
                                    "Application Support", "SlimPDF")
         else:
-            app_dir = os.path.join(os.path.expanduser("~"), ".pdf-compressor")
+            # Linux: follow the XDG Base Directory spec when configured
+            xdg_data = os.environ.get("XDG_DATA_HOME")
+            if xdg_data:
+                app_dir = os.path.join(xdg_data, "SlimPDF")
+            else:
+                app_dir = os.path.join(os.path.expanduser("~"),
+                                       ".local", "share", "SlimPDF")
     else:
         app_dir = os.path.dirname(os.path.abspath(__file__))
     return app_dir
@@ -67,6 +73,12 @@ FILE_CLEANUP_SECONDS = 5 * 60  # 5 minutes
 
 # Compression timeout (seconds)
 COMPRESS_TIMEOUT = 5 * 60  # 5 minutes
+
+# Rate limiting (requests per window per client IP). Generous for a local
+# single-user app; only meant to bound abuse of the upload/compress endpoints.
+RATE_LIMIT_UPLOAD = 60
+RATE_LIMIT_COMPRESS = 20
+RATE_LIMIT_WINDOW_SECONDS = 60
 
 # ========== Ghostscript Paths ==========
 
@@ -106,3 +118,16 @@ GS_PATHS = _build_gs_paths()
 
 # ========== Ensure Directories Exist ==========
 # Note: Directory creation moved to app.py create_app() to avoid side effects on import
+
+
+def ensure_private_dir(path: str) -> None:
+    """Create a directory and, on POSIX systems, restrict it to the current
+    user (0o700) so uploaded/downloaded PDFs are not readable by other local
+    accounts. On Windows the mode argument is ignored by the OS and the
+    directory inherits the parent's ACL, so this is a no-op beyond mkdir."""
+    os.makedirs(path, exist_ok=True)
+    if os.name != "nt":
+        try:
+            os.chmod(path, 0o700)
+        except OSError:
+            pass  # best effort; never block startup on permission quirks

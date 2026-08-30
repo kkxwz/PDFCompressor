@@ -52,7 +52,8 @@
     "ghostscriptNotFound": "Ghostscript 未安装，压缩功能不可用",
     "connectionInterrupted": "连接中断，请刷新页面重试",
     "serverUnreachable": "无法连接服务器，请检查应用是否正在运行",
-    "invalidRequest": "无效的请求数据"
+    "invalidRequest": "无效的请求数据",
+    "rateLimited": "请求过于频繁，请稍后再试"
   },
   "progress": {
     "analyzing": "正在分析 PDF 文件...",

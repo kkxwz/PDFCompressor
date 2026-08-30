@@ -39,7 +39,9 @@ def get_gs_version(gs_path: str) -> Optional[str]:
     try:
         result = subprocess.run(
             [gs_path, "--version"],
-            capture_output=True, text=True, timeout=10
+            # errors="replace": gs may print in the platform locale encoding
+            # (e.g. cp936/cp1252 on Windows); never crash on undecodable bytes
+            capture_output=True, text=True, errors="replace", timeout=10
         )
         return result.stdout.strip()
     except Exception:
@@ -203,6 +205,9 @@ def _get_total_pages(gs_path: str, input_path: str) -> int:
         cmd = [
             gs_path,
             "-q", "-dNODISPLAY", "-dBATCH", "-dNOPAUSE",
+            # Explicit even though gs >= 9.50 defaults to SAFER, so older
+            # Ghostscript builds stay sandboxed as well
+            "-dSAFER",
             # gs >= 9.50 runs SAFER by default; grant read access to the
             # input file only, otherwise the PostScript file operator fails
             # with /invalidfileaccess and page count silently becomes 0
@@ -210,7 +215,9 @@ def _get_total_pages(gs_path: str, input_path: str) -> int:
             "-c",
             f"({ps_path}) (r) file runpdfbegin pdfpagecount = quit"
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, errors="replace", timeout=30
+        )
         output = result.stdout.strip()
         match = re.search(r"(\d+)", output)
         if match:
@@ -300,11 +307,14 @@ def compress_pdf(
     try:
         # Execute Ghostscript. Progress lines ("Page N") are printed on stdout,
         # so merge stderr into stdout and read a single pipe.
+        # errors="replace": gs error text may use the platform locale encoding
+        # (Windows), decoding must never raise mid-compression.
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True
+            text=True,
+            errors="replace",
         )
 
         # Keep the tail of output for error reporting

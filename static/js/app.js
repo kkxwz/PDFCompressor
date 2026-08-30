@@ -86,8 +86,15 @@
         INVALID_LEVEL: 'errors.startCompressionFailed',
         FILE_NOT_FOUND: 'errors.fileNotFound',
         SAVE_FAILED: 'errors.uploadFailed',
-        TASK_NOT_FOUND: 'errors.compressionFailed'
+        TASK_NOT_FOUND: 'errors.compressionFailed',
+        RATE_LIMITED: 'errors.rateLimited',
+        CSRF_REJECTED: 'errors.invalidRequest'
     };
+
+    // Headers attached to every state-changing request. The server rejects
+    // POSTs without it (CSRF guard): an HTML form or cross-origin page can
+    // never set a custom header, so forged requests are blocked.
+    const API_HEADERS = { 'X-Requested-With': 'XMLHttpRequest' };
 
     function messageForError(code, fallbackKey, backendMessage) {
         if (code && ERROR_CODE_KEYS[code]) return t(ERROR_CODE_KEYS[code]);
@@ -281,6 +288,7 @@
         try {
             const response = await fetch('/api/upload', {
                 method: 'POST',
+                headers: API_HEADERS,
                 body: formData
             });
 
@@ -349,7 +357,7 @@
         try {
             const response = await fetch('/api/compress', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: Object.assign({ 'Content-Type': 'application/json' }, API_HEADERS),
                 body: JSON.stringify({
                     file_id: currentFileId,
                     level: level

@@ -7,9 +7,17 @@ from flask import Blueprint, Response, request, jsonify
 from werkzeug.utils import secure_filename
 
 import config
+from security import RateLimiter, reject_rate_limited, security_logger
 from utils import format_size
 
 upload_bp = Blueprint("upload", __name__)
+
+# Bounds abuse of the upload endpoint (disk exhaustion); per client IP
+_upload_limiter = RateLimiter(config.RATE_LIMIT_UPLOAD,
+                              config.RATE_LIMIT_WINDOW_SECONDS)
+
+# Filenames are truncated in audit logs so hostile names cannot bloat them
+_LOG_NAME_LIMIT = 80
 
 
 def allowed_file(filename: str) -> bool:
@@ -21,6 +29,9 @@ def allowed_file(filename: str) -> bool:
 @upload_bp.route("/api/upload", methods=["POST"])
 def upload_file() -> tuple[Response, int]:
     """Upload PDF file"""
+    if not _upload_limiter.allow(request.remote_addr or "unknown"):
+        return reject_rate_limited("/api/upload", request.remote_addr)
+
     # Check if file exists in request
     if "file" not in request.files:
         return jsonify({
@@ -38,6 +49,10 @@ def upload_file() -> tuple[Response, int]:
 
     # Check file type
     if not allowed_file(file.filename):
+        security_logger.info(
+            "Upload rejected (extension): %r from %s",
+            file.filename[:_LOG_NAME_LIMIT], request.remote_addr,
+        )
         return jsonify({
             "error": "ONLY_PDF",
             "message": "Only PDF format files are supported"
@@ -47,6 +62,10 @@ def upload_file() -> tuple[Response, int]:
     header = file.stream.read(5)
     file.stream.seek(0)
     if header != b"%PDF-":
+        security_logger.info(
+            "Upload rejected (magic bytes %r): %r from %s",
+            header, file.filename[:_LOG_NAME_LIMIT], request.remote_addr,
+        )
         return jsonify({
             "error": "ONLY_PDF",
             "message": "Only PDF format files are supported"

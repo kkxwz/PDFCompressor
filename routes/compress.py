@@ -13,8 +13,13 @@ from flask import Blueprint, request, jsonify, Response, send_file, stream_with_
 
 import config
 from compress.task_manager import get_task_manager, TaskStatus
+from security import RateLimiter, reject_rate_limited, security_logger
 
 compress_bp = Blueprint("compress", __name__)
+
+# Bounds abuse of the compression endpoint (CPU/Ghostscript exhaustion)
+_compress_limiter = RateLimiter(config.RATE_LIMIT_COMPRESS,
+                                config.RATE_LIMIT_WINDOW_SECONDS)
 
 # file_id is server-generated uuid4; reject anything else before it reaches glob
 _UUID_RE = re.compile(
@@ -26,6 +31,7 @@ def _find_upload_file(file_id: str) -> tuple[Optional[str], Optional[str]]:
     """Find uploaded file by file_id, return (file_path, original_filename)"""
     # Validate format first: prevents glob wildcards / path separators injection
     if not _UUID_RE.match(file_id):
+        security_logger.info("Rejected malformed file_id: %r", file_id[:80])
         return None, None
 
     pattern = os.path.join(config.UPLOAD_FOLDER, f"{file_id}_*.pdf")
@@ -43,6 +49,9 @@ def _find_upload_file(file_id: str) -> tuple[Optional[str], Optional[str]]:
 @compress_bp.route("/api/compress", methods=["POST"])
 def start_compress() -> tuple[Response, int]:
     """Start compression task"""
+    if not _compress_limiter.allow(request.remote_addr or "unknown"):
+        return reject_rate_limited("/api/compress", request.remote_addr)
+
     # silent=True: malformed JSON returns None instead of raising;
     # explicit None check so an empty JSON object {} still reaches the
     # MISSING_FILE_ID branch below
@@ -64,6 +73,7 @@ def start_compress() -> tuple[Response, int]:
         }), 400
 
     if level not in ("low", "medium", "high"):
+        security_logger.info("Rejected invalid compression level: %r", str(level)[:40])
         return jsonify({
             "error": "INVALID_LEVEL",
             "message": "Invalid compression level, available: low, medium, high"
@@ -97,6 +107,10 @@ def start_compress() -> tuple[Response, int]:
 @compress_bp.route("/api/progress/<task_id>")
 def get_progress(task_id: str) -> Response | tuple[Response, int]:
     """SSE progress push"""
+    if not _UUID_RE.match(task_id):
+        security_logger.info("Rejected malformed task_id on progress: %r", task_id[:80])
+        return jsonify({"error": "TASK_NOT_FOUND", "message": "Task not found"}), 404
+
     task_manager = get_task_manager()
     task = task_manager.get_task(task_id)
 
@@ -170,6 +184,10 @@ def get_progress(task_id: str) -> Response | tuple[Response, int]:
 @compress_bp.route("/api/download/<task_id>")
 def download_file(task_id: str) -> Response | tuple[Response, int]:
     """Download compression result"""
+    if not _UUID_RE.match(task_id):
+        security_logger.info("Rejected malformed task_id on download: %r", task_id[:80])
+        return jsonify({"error": "TASK_NOT_FOUND", "message": "Task not found"}), 404
+
     task_manager = get_task_manager()
     task = task_manager.get_task(task_id)
 

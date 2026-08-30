@@ -52,7 +52,8 @@
     "ghostscriptNotFound": "Ghostscript not installed. Compression is unavailable.",
     "connectionInterrupted": "Connection interrupted. Please refresh the page and try again.",
     "serverUnreachable": "Server unreachable. Please check if the application is running.",
-    "invalidRequest": "Invalid request data"
+    "invalidRequest": "Invalid request data",
+    "rateLimited": "Too many requests, please slow down and retry later"
   },
   "progress": {
     "analyzing": "Analyzing PDF file...",

@@ -85,6 +85,7 @@ files = [
     "app.py",
     "config.py",
     "utils.py",
+    "security.py",
     "__version__.py",
     "routes",
     "compress",

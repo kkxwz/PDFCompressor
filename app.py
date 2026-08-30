@@ -17,13 +17,31 @@ from logging.handlers import RotatingFileHandler
 from types import FrameType
 from typing import Optional
 
-from flask import Flask, Response, render_template, jsonify, send_from_directory
+from flask import Flask, Response, render_template, request, jsonify, send_from_directory
 from werkzeug.exceptions import RequestEntityTooLarge
 
 import config
+import security
 from routes.upload import upload_bp
 from routes.compress import compress_bp
 from routes.health import health_bp
+
+# Loopback addresses considered safe; binding anything else exposes the
+# (single-user, auth-less) app to the network and gets a startup warning
+_LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+
+# Security response headers applied to every response (defense in depth;
+# the frontend never embeds third-party content)
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
+        "base-uri 'self'; form-action 'self'"
+    ),
+}
 
 
 def _setup_logging() -> None:
@@ -57,9 +75,10 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> Flask:
     """Create Flask application"""
-    # Ensure required directories exist
-    os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
-    os.makedirs(config.OUTPUT_FOLDER, exist_ok=True)
+    # Ensure required directories exist (0o700 on POSIX: user PDFs must not
+    # be readable by other local accounts)
+    config.ensure_private_dir(config.UPLOAD_FOLDER)
+    config.ensure_private_dir(config.OUTPUT_FOLDER)
 
     resource_dir = config.RESOURCE_DIR
     template_folder = os.path.join(resource_dir, "templates")
@@ -79,6 +98,19 @@ def create_app() -> Flask:
     app.register_blueprint(compress_bp)
     app.register_blueprint(health_bp)
 
+    # CSRF guard: reject state-changing requests without the custom header
+    # (an HTML form / cross-origin page cannot set it; see security.py)
+    @app.before_request
+    def _csrf_guard() -> Optional[tuple[Response, int]]:
+        return security.check_csrf(request)
+
+    # Security response headers on every response
+    @app.after_request
+    def _security_headers(response: Response) -> Response:
+        for header, value in _SECURITY_HEADERS.items():
+            response.headers.setdefault(header, value)
+        return response
+
     # Return JSON (not Flask's default HTML page) when MAX_CONTENT_LENGTH is hit
     @app.errorhandler(413)
     def request_entity_too_large(e: RequestEntityTooLarge) -> tuple[Response, int]:
@@ -86,6 +118,13 @@ def create_app() -> Flask:
             "error": "FILE_TOO_LARGE",
             "message": f"File too large, max supported {config.MAX_UPLOAD_MB}MB"
         }), 413
+
+    @app.errorhandler(429)
+    def too_many_requests(e: object) -> tuple[Response, int]:
+        return jsonify({
+            "error": "RATE_LIMITED",
+            "message": "Too many requests, please slow down and retry"
+        }), 429
 
     # Home route (injects config-derived values so the frontend never
     # hardcodes the upload limit / cleanup interval / version)
@@ -140,6 +179,18 @@ if __name__ == "__main__":
     logger.info(f"Resource dir: {config.RESOURCE_DIR}")
     logger.info(f"Frozen mode: {'Yes' if config.is_frozen() else 'No'}")
     logger.info("=" * 50)
+
+    # Warn loudly when bound beyond loopback: the app has no authentication
+    if config.HOST not in _LOOPBACK_HOSTS:
+        logger.warning(
+            f"HOST={config.HOST} is not loopback - the service is reachable "
+            "from the network. SlimPDF has no authentication and is designed "
+            "for 127.0.0.1; use an SSH tunnel or firewall if remote access "
+            "is intended."
+        )
+        security.security_logger.warning(
+            "Non-loopback bind: HOST=%s PORT=%s", config.HOST, config.PORT
+        )
 
     # Check Ghostscript
     from compress.engine import find_ghostscript, get_gs_version
