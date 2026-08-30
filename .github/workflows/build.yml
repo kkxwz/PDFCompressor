@@ -181,37 +181,29 @@ jobs:
       - name: Install Ghostscript
         shell: pwsh
         run: |
-          # chocolatey hangs on windows-11-arm (x64 emulation), so install
-          # directly from the official Artifex self-extracting installer.
-          # gs10071w64.exe is NSIS-based and honors /S for silent install.
+          # chocolatey AND the NSIS installer (/S) both hang on
+          # windows-11-arm under x64 emulation. Instead, extract the
+          # self-extracting installer with the preinstalled 7-Zip and
+          # vendor the files directly - no system install at all.
           $installer = "$env:RUNNER_TEMP\gs10071w64.exe"
           Invoke-WebRequest -Uri "https://github.com/ArtifexSoftware/ghostpdl-downloads/releases/download/gs10071/gs10071w64.exe" -OutFile $installer
-          Start-Process -FilePath $installer -ArgumentList "/S" -Wait
-          $gsPath = (Get-Command gswin64c -ErrorAction SilentlyContinue).Source
-          if (-not $gsPath) {
-            # Search common install paths
-            $searchPaths = @(
-              "C:\Program Files\gs\*\bin\gswin64c.exe",
-              "C:\Program Files (x86)\gs\*\bin\gswin64c.exe"
-            )
-            foreach ($pattern in $searchPaths) {
-              $found = Get-Item $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($found) { $gsPath = $found.FullName; break }
-            }
+          $extract = "$env:RUNNER_TEMP\gs-extract"
+          & "C:\Program Files\7-Zip\7z.exe" x -y "-o$extract" $installer
+          $srcBin = Get-Item "$extract\bin\gswin64c.exe" -ErrorAction SilentlyContinue
+          if (-not $srcBin) {
+            Get-ChildItem -Recurse $extract | ForEach-Object { Write-Host $_.FullName }
+            throw "gswin64c.exe not found after extracting installer"
           }
-          if ($gsPath) {
-            Write-Host "Found Ghostscript: $gsPath"
-            $binDir = Split-Path $gsPath -Parent
-            $destDir = "vendor\ghostscript\x64"
-            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
-            Copy-Item "$gsPath" "$destDir\" -Force
-            Copy-Item "$binDir\*.dll" "$destDir\" -Force
-            $libDir = Join-Path (Split-Path $binDir -Parent) "lib"
-            if (Test-Path $libDir) {
-              Copy-Item -Recurse -Force "$libDir" "$destDir\lib"
-            }
-          } else {
-            Write-Host "WARNING: Ghostscript not found, build may fail"
+          $gsPath = $srcBin.FullName
+          Write-Host "Found Ghostscript: $gsPath"
+          $binDir = Split-Path $gsPath -Parent
+          $destDir = "vendor\ghostscript\x64"
+          New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+          Copy-Item "$gsPath" "$destDir\" -Force
+          Copy-Item "$binDir\*.dll" "$destDir\" -Force
+          $libDir = Join-Path (Split-Path $binDir -Parent) "lib"
+          if (Test-Path $libDir) {
+            Copy-Item -Recurse -Force "$libDir" "$destDir\lib"
           }
 
       - name: PyInstaller Build

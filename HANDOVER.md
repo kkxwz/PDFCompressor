@@ -35,7 +35,7 @@
 15. **Linux frozen 数据目录已改为 XDG 规范**（`$XDG_DATA_HOME/SlimPDF` 或 `~/.local/share/SlimPDF`，替代旧 `~/.pdf-compressor`）；CI 从未发布 Linux 包，无存量迁移负担。
 16. **SSE 进度事件带 `meta` 结构字段**（`{"key": analyzing|processing|page|complete}`，page 附 `current`/`total`）：前端 `localizeProgressMessage` 优先用 meta，英文 `message` 仅作兼容兑底；新增进度阶段时必须同时产出 meta，并在前端 `META_KEY_TO_LOCALE` 登记。
 17. **`compress_pdf` 进度回调为三参** `(progress, message, meta=None)`：mock 该回调的测试/代码需用 `lambda p, m, meta=None` 签名；预发布 tag（含 `-`）不会触发 release job。
-18. **windows-11-arm runner 上 `choco install` 会无限挂起**（v1.1.0-rc.1 实测同一步骤 >25 分钟未完成，x64 上约 2 分钟）：arm64 job 已改为直下 Artifex 官方安装包 `gs10071w64.exe` 静默安装（`/S`），不要在 arm64 job 里再用 choco。
+18. **windows-11-arm runner 上 x64 仿真安装器会无限挂起**：`choco install`（rc.1 实测 >25 分钟）与官方安装包 `gs10071w64.exe` 的 `/S` 静默安装（rc.2 实测 >20 分钟）均挂起，而同一脚本在 x64 上约 2 分钟。最终方案：用 runner 预装的 `C:\Program Files\7-Zip\7z.exe` 直接解包自解压安装包，从 `bin/` 拷出 `gswin64c.exe`/dll/lib，完全不执行安装程序（待 `v1.1.0-rc.3` 验证）。arm64 job 里不要再引入任何安装器型依赖。
 
 ## 四、代码索引
 
