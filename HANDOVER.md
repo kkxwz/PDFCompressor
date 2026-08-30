@@ -14,7 +14,7 @@
 
 ## 二、待办事项
 
-- [ ] Windows arm64 CI job 未经真实 tag 触发验证（待 `v1.1.0-rc.1` 预发布 tag 验证，见归档①；首次正式发版仍需盯）
+- [x] ~~Windows arm64 CI job 未经真实 tag 触发验证~~ ✅ 已完成：`v1.1.0-rc.3` 全绿（test 3.10-3.13 + macOS + x64 + arm64），release job 正确跳过；正式发版打稳定 tag `v1.1.0` 即可
 
 ## 三、环境陷阱（必读）
 
@@ -35,7 +35,7 @@
 15. **Linux frozen 数据目录已改为 XDG 规范**（`$XDG_DATA_HOME/SlimPDF` 或 `~/.local/share/SlimPDF`，替代旧 `~/.pdf-compressor`）；CI 从未发布 Linux 包，无存量迁移负担。
 16. **SSE 进度事件带 `meta` 结构字段**（`{"key": analyzing|processing|page|complete}`，page 附 `current`/`total`）：前端 `localizeProgressMessage` 优先用 meta，英文 `message` 仅作兼容兑底；新增进度阶段时必须同时产出 meta，并在前端 `META_KEY_TO_LOCALE` 登记。
 17. **`compress_pdf` 进度回调为三参** `(progress, message, meta=None)`：mock 该回调的测试/代码需用 `lambda p, m, meta=None` 签名；预发布 tag（含 `-`）不会触发 release job。
-18. **windows-11-arm runner 上 x64 仿真安装器会无限挂起**：`choco install`（rc.1 实测 >25 分钟）与官方安装包 `gs10071w64.exe` 的 `/S` 静默安装（rc.2 实测 >20 分钟）均挂起，而同一脚本在 x64 上约 2 分钟。最终方案：用 runner 预装的 `C:\Program Files\7-Zip\7z.exe` 直接解包自解压安装包，从 `bin/` 拷出 `gswin64c.exe`/dll/lib，完全不执行安装程序（待 `v1.1.0-rc.3` 验证）。arm64 job 里不要再引入任何安装器型依赖。
+18. **windows-11-arm runner 上 x64 仿真安装器会无限挂起**：`choco install`（rc.1 实测 >25 分钟）与官方安装包 `gs10071w64.exe` 的 `/S` 静默安装（rc.2 实测 >20 分钟）均挂起，而同一脚本在 x64 上约 2 分钟。最终方案（`b51234c`）：用 runner 预装的 `C:\Program Files\7-Zip\7z.exe` 直接解包自解压安装包，从 `bin/` 拷出 `gswin64c.exe`/dll/lib，完全不执行安装程序；**已验证**：`v1.1.0-rc.3` 全绿（七项 job 全过，release 正确跳过）。arm64 job 里不要再引入任何安装器型依赖。
 
 ## 四、代码索引
 
@@ -91,6 +91,7 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 - 【冒烟发现并修复】回退原文件早退分支未发完成事件 → done 事件 meta 残留 processing；已在该分支补 `progress_callback(100, ..., {"key": "complete"})` 并加回归断言（陷阱 16/17 的来源）
 - 版本与发布策略：`__version__.py` 1.0.1 → 1.1.0；release job 条件追加 `!contains(github.ref, '-')`，预发布 tag 只跑构建不发 Release，可安全验证 arm64 job
 - 【rc.1 实测发现】windows-11-arm 上 `choco install ghostscript` 无限挂起（>25 分钟，同步骤 x64 约 2 分钟）→ `0b9e02a` 将 arm64 job 改为直下官方 `gs10071w64.exe` 静默安装（`/S`），打 `v1.1.0-rc.2` 重新验证；rc.1 run 可在 GitHub UI 手动取消
+- 【rc.2→rc.3 闭环】rc.2 实测 `/S` 静默安装同样挂起（>20 分钟）→ `b51234c` 改用 7-Zip 解包直取二进制；**`v1.1.0-rc.3` 全绿**（run 33323656731）：test 3.10/3.11/3.12/3.13 ✅、build-macos ✅、build-windows-x64 ✅、build-windows-arm64 ✅、release 正确 skipped（预发布策略验证通过）。rc.2 挂起 run 可在 GitHub UI 手动取消；正式发版只需打稳定 tag `v1.1.0`
 
 ### 验证结果（原始记录）
 
