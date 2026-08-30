@@ -232,7 +232,7 @@ def compress_pdf(
     input_path: str,
     output_path: str,
     level: str = "medium",
-    progress_callback: Optional[Callable[[int, str], None]] = None,
+    progress_callback: Optional[Callable[[int, str, Optional[dict[str, Any]]], None]] = None,
     timeout: Optional[int] = None
 ) -> dict[str, Any]:
     """
@@ -242,7 +242,9 @@ def compress_pdf(
         input_path: Input PDF file path
         output_path: Output PDF file path
         level: Compression level (low/medium/high)
-        progress_callback: Progress callback function callback(progress_percent, stage_message)
+        progress_callback: Progress callback callback(progress_percent, stage_message, meta).
+            meta is a machine-readable dict ({"key": ...} plus extras for the
+            "page" key) so clients can localize without parsing the English text.
         timeout: Timeout in seconds
 
     Returns:
@@ -292,13 +294,13 @@ def compress_pdf(
     original_size = os.path.getsize(input_path)
 
     if progress_callback:
-        progress_callback(5, "Analyzing PDF file...")
+        progress_callback(5, "Analyzing PDF file...", {"key": "analyzing"})
 
     # Get total pages
     total_pages = _get_total_pages(gs_path, input_path)
 
     if progress_callback:
-        progress_callback(10, "Compressing PDF...")
+        progress_callback(10, "Compressing PDF...", {"key": "processing"})
 
     # Build command
     cmd = _build_gs_command(gs_path, input_path, output_path, profile)
@@ -339,10 +341,13 @@ def compress_pdf(
                         if match and progress_callback:
                             progress_callback(
                                 current_progress,
-                                f"Compressing page {match.group(1)}/{total_pages}..."
+                                f"Compressing page {match.group(1)}/{total_pages}...",
+                                {"key": "page", "current": int(match.group(1)),
+                                 "total": total_pages},
                             )
                     elif progress_callback:
-                        progress_callback(current_progress, "Compressing...")
+                        progress_callback(current_progress, "Compressing...",
+                                          {"key": "processing"})
 
         reader = threading.Thread(target=_drain_output, daemon=True)
         reader.start()
@@ -387,6 +392,8 @@ def compress_pdf(
         shutil.copy2(input_path, output_path)
         compressed_size = original_size
         logger.warning(f"Compressed file larger ({original_size} -> {compressed_size}), returning original")
+        if progress_callback:
+            progress_callback(100, "Compression complete!", {"key": "complete"})
         return {
             "success": True,
             "original_size": original_size,
@@ -398,7 +405,7 @@ def compress_pdf(
     ratio = (1 - compressed_size / original_size) * 100
 
     if progress_callback:
-        progress_callback(100, "Compression complete!")
+        progress_callback(100, "Compression complete!", {"key": "complete"})
 
     return {
         "success": True,

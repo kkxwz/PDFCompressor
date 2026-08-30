@@ -43,15 +43,20 @@ class Task:
         self.status = TaskStatus.PENDING
         self.progress = 0
         self.stage_message = ""
+        # Machine-readable companion to stage_message ({"key": ...}) so the
+        # frontend can localize without parsing English text
+        self.stage_meta: Optional[dict[str, Any]] = None
         self.result: Optional[dict[str, Any]] = None
         self.error: Optional[str] = None
 
         self.created_at = time.time()
 
-    def update_progress(self, progress: int, message: str) -> None:
+    def update_progress(self, progress: int, message: str,
+                        meta: Optional[dict[str, Any]] = None) -> None:
         """Update progress (thread-safe)"""
         self.progress = progress
         self.stage_message = message
+        self.stage_meta = meta
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dict"""
@@ -61,6 +66,8 @@ class Task:
             "progress": self.progress,
             "stage_message": self.stage_message,
         }
+        if self.stage_meta:
+            data["stage_meta"] = self.stage_meta
         if self.result:
             data["result"] = self.result
         if self.error:

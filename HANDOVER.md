@@ -4,20 +4,17 @@
 
 ---
 
-## 一、项目现状（2026-08-30 第三次更新）
+## 一、项目现状（2026-08-30 第四次更新）
 
-- **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。
-- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；2026-08-30 完成全方位安全加固与跨平台兼容性增强（详见文末归档「2026-08-30 安全加固与兼容性增强」）：CSRF 防护、安全响应头、上传/压缩限流、异常行为审计日志、目录私有权限、Windows 编码容错均已落地并回归验证。
-- **国际化**：前端已接入 zh/en 双语切换（语言包在 `static/locales/`，顶栏有切换按钮，localStorage 持久化，默认跟随浏览器语言）。
-- **测试**：`pytest` 43/43 通过（新增 test_security.py 12 例）；`mypy`（strict）全量通过（13 文件）。
-- **CI**：`.github/workflows/build.yml` 含 test（前置门禁，**Python 3.10/3.11/3.12/3.13 矩阵**）+ macOS + Windows x64 + Windows arm64 四个 job；tag `v*` 触发发布；依赖统一从 `requirements.lock` 安装（已审计无已知 CVE：Flask 3.1.3 / Werkzeug 3.1.8 / Jinja2 3.1.6 均为各自最新修复版本）。
-- **依赖审计结论（2026-08-30）**：无数据库 → 无 SQL 注入面；Jinja2 自动转义 + 前端全部走 textContent → 无 XSS 注入点；CSP/nosniff/X-Frame-Options 为纵深防御。
+- **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。当前版本 **1.1.0**（`__version__.py`）。
+- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；2026-08-30 完成安全加固（归档②）与测试补齐 + SSE 结构化重构（归档①）。
+- **国际化**：前端已接入 zh/en 双语切换；SSE 进度消息已结构化（后端 `meta` 字段，前端优先用 key 映射，英文正则仅作兼容兑底）。
+- **测试**：`pytest` 61/61 通过（新增 test_engine_flow.py 11 例 + test_task_manager.py 7 例，原缺口已补齐）；`mypy`（strict）全量通过（13 文件）。
+- **CI**：test 门禁为 Python 3.10/3.11/3.12/3.13 矩阵；release job 仅稳定 tag 触发（含 `-` 的预发布 tag 只跑构建不发 Release）；依赖统一从 `requirements.lock` 安装（已审计无已知 CVE）。
 
 ## 二、待办事项
 
-- [ ] Windows arm64 CI job 未经真实 tag 触发验证（`windows-11-arm` runner + choco 安装链路纸面可行，首次发版时需盯一下）
-- [ ] 测试缺口：`compress_pdf` 主流程、`task_manager` 模块仍无单元测试（安全面已由 test_security.py 覆盖）
-- [ ] 后端 SSE stage_message 仍输出英文，前端靠正则映射成当前语言（`localizeProgressMessage`）；若后端消息文案变动需同步前端正则
+- [ ] Windows arm64 CI job 未经真实 tag 触发验证（待 `v1.1.0-rc.1` 预发布 tag 验证，见归档①；首次正式发版仍需盯）
 
 ## 三、环境陷阱（必读）
 
@@ -36,6 +33,8 @@
 13. **上传/压缩接口有限流**（默认 60/20 次每分钟每 IP，超限 429 `RATE_LIMITED`）：限流器是模块级单例（`routes.upload._upload_limiter` / `routes.compress._compress_limiter`），高频调用同接口的测试须先 monkeypatch 替换（参考 tests/test_security.py fixture）。
 14. **安全审计日志走 `slimpdf.security` logger**：CSRF 拒绝、限流命中、非法 file_id/task_id、非法扩展名/魔数上传、非回环绑定均记录于此；排查异常行为时按该 logger 名过滤。
 15. **Linux frozen 数据目录已改为 XDG 规范**（`$XDG_DATA_HOME/SlimPDF` 或 `~/.local/share/SlimPDF`，替代旧 `~/.pdf-compressor`）；CI 从未发布 Linux 包，无存量迁移负担。
+16. **SSE 进度事件带 `meta` 结构字段**（`{"key": analyzing|processing|page|complete}`，page 附 `current`/`total`）：前端 `localizeProgressMessage` 优先用 meta，英文 `message` 仅作兼容兑底；新增进度阶段时必须同时产出 meta，并在前端 `META_KEY_TO_LOCALE` 登记。
+17. **`compress_pdf` 进度回调为三参** `(progress, message, meta=None)`：mock 该回调的测试/代码需用 `lambda p, m, meta=None` 签名；预发布 tag（含 `-`）不会触发 release job。
 
 ## 四、代码索引
 
@@ -49,14 +48,14 @@
 | `routes/upload.py` | POST /api/upload | 扩展名白名单 + `%PDF-` magic bytes 双重校验；拒绝事件写审计日志；限流 60 次/分钟 |
 | `routes/compress.py` | /api/compress、/api/progress(SSE)、/api/download | `_UUID_RE` 同时校验 file_id 与 task_id（progress/download 也防路径穿越）；SSE 硬截止时间 + 15s 心跳；限流 20 次/分钟 |
 | `routes/health.py` | /api/health | 探测结果缓存（成功永久、失败 30s TTL）；返回应用版本号 |
-| `compress/engine.py` | Ghostscript 调用核心 | 单管道 + `_drain_output` 线程；路径校验分离；`--permit-file-read`；页数探测显式 `-dSAFER`（兼容旧版 gs）；子进程解码 `errors="replace"`（Windows 编码容错） |
-| `compress/task_manager.py` | 任务字典 + 线程池(4) + 清理线程 | 清理跳过 PENDING/PROCESSING，僵死任务宽限期 = 清理时长 + 压缩超时 |
+| `compress/engine.py` | Ghostscript 调用核心 | 单管道 + `_drain_output` 线程；路径校验分离；`--permit-file-read`；页数探测显式 `-dSAFER`；子进程解码 `errors="replace"`；进度回调三参带 `meta`（含回退原文件分支） |
+| `compress/task_manager.py` | 任务字典 + 线程池(4) + 清理线程 | 清理跳过 PENDING/PROCESSING，僵死任务宽限期 = 清理时长 + 压缩超时；`stage_meta` 随 to_dict 导出 |
 | `compress/profiles.py` | low/medium/high 三档 gs 参数 | 纯数据 |
-| `static/js/app.js` | 前端逻辑 | i18n 运行时；`API_HEADERS`（X-Requested-With）随所有 fetch；`RATE_LIMITED`/`CSRF_REJECTED` 错误码映射 |
+| `static/js/app.js` | 前端逻辑 | i18n 运行时；`API_HEADERS`（X-Requested-With）随所有 fetch；`RATE_LIMITED`/`CSRF_REJECTED` 错误码映射；`META_KEY_TO_LOCALE` 优先、正则兑底的 SSE 本地化 |
 | `static/locales/zh.json`、`en.json` | 双语语言包 | key 集合必须保持一致；含 `errors.rateLimited` |
 | `templates/index.html` | 页面结构 | 文案元素均挂 `data-i18n`/`data-i18n-title`；body data-* 注入后端配置 |
 | `requirements.lock` | 锁定依赖版本 | CI 全部 job 从此安装；已审计无已知 CVE（Flask 3.1.3/Werkzeug 3.1.8/Jinja2 3.1.6） |
-| `tests/` | 43 个用例 | 全部 tmp_path/monkeypatch 隔离；含 test_security.py（CSRF/安全头/限流/非法 task_id）；缺口：compress_pdf 主流程、task_manager 模块无测试 |
+| `tests/` | 61 个用例 | 全部 tmp_path/monkeypatch 隔离；覆盖安全（test_security）、引擎主流程（test_engine_flow，FakePopen 全 mock）、任务管理（test_task_manager） |
 
 ## 五、常用命令
 
@@ -76,7 +75,34 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 
 ---
 
-## ✅ 已完成：2026-08-30 全方位安全加固与跨平台兼容性增强
+## ✅ 已完成：2026-08-30 测试补齐、SSE 结构化重构与 1.1.0 版本发布准备（归档①）
+
+### 背景与需求（原始记录）
+
+安全加固提交后的后续收尾：用户确认按建议顺序逐项执行——提交改动 → 补齐测试缺口 → 打预发布 tag 验证 CI，并将最低优先级的 SSE 本地化重构一并完成。
+
+### 实施内容（原始记录）
+
+- 提交：安全加固 15 文件 → `4421ee6`
+- 新建 `tests/test_engine_flow.py`（11 例）：FakePopen 全 mock gs（可配进度行/退出码/超时/输出文件），覆盖成功、压缩变大回退原文件、gs 未找到、输入缺失、路径穿越输入/非法输出路径、超时 kill、非零退出尾部报错、无输出文件、页数探测（含 `-dSAFER`/`--permit-file-read` 断言）及其失败分支；验证 meta 契约（完成事件 `{"key": "complete"}`、page 事件带 current/total）
+- 新建 `tests/test_task_manager.py`（7 例）：任务创建布局、成功生命周期（结果发布 + 输入文件清理）、引擎错误透传、异常不杀线程池、过期清理（删除任务+输出文件）、新任务保留、PROCESSING 宽限期（窗口内保留/超宽限回收）
+- SSE 结构化：`compress_pdf` 进度回调改三参 `(progress, message, meta)`，meta key 为 analyzing/processing/page/complete；`Task.stage_meta` 随 SSE `meta` 字段下发；前端 `localizeProgressMessage` 优先 meta（`META_KEY_TO_LOCALE`），英文正则保留作兼容兑底（待办第 3 项消除）
+- 【冒烟发现并修复】回退原文件早退分支未发完成事件 → done 事件 meta 残留 processing；已在该分支补 `progress_callback(100, ..., {"key": "complete"})` 并加回归断言（陷阱 16/17 的来源）
+- 版本与发布策略：`__version__.py` 1.0.1 → 1.1.0；release job 条件追加 `!contains(github.ref, '-')`，预发布 tag 只跑构建不发 Release，可安全验证 arm64 job
+
+### 验证结果（原始记录）
+
+- `pytest` 61/61（43 + 新增 18）；`mypy` strict Success（13 文件）；`node --check` app.js 通过；workflow YAML 合法
+- 真实冒烟（SLIMPDF_PORT=5061）：SSE 事件确认携带 `meta`（analyzing → 修复后 complete）；修复前的残留 processing 问题即由此发现
+- 待验证：`v1.1.0-rc.1` tag 推送后的 CI 四版本矩阵与 arm64 构建（待办第 1 项）
+
+### 未处理遗留
+
+见文档前部「二、待办事项」（arm64 CI 待预发布 tag 验证）。
+
+---
+
+## ✅ 已完成：2026-08-30 全方位安全加固与跨平台兼容性增强（归档②）
 
 ### 背景与需求（原始记录）
 

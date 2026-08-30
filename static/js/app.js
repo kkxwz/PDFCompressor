@@ -102,8 +102,23 @@
         return t(fallbackKey || 'errors.unknown');
     }
 
-    // Localize backend SSE stage messages (backend emits English)
-    function localizeProgressMessage(message) {
+    // Localize backend SSE stage messages. The backend sends a structured
+    // meta key (preferred); the regex fallback covers legacy messages.
+    const META_KEY_TO_LOCALE = {
+        analyzing: 'progress.analyzing',
+        processing: 'progress.processing',
+        complete: 'app.compressionComplete'
+    };
+
+    function localizeProgressMessage(message, meta) {
+        if (meta) {
+            if (meta.key === 'page' && meta.current && meta.total) {
+                return t('progress.page', { current: meta.current, total: meta.total });
+            }
+            if (META_KEY_TO_LOCALE[meta.key]) {
+                return t(META_KEY_TO_LOCALE[meta.key]);
+            }
+        }
         if (!message) return t('progress.processing');
         const pageMatch = message.match(/page (\d+)\/(\d+)/i);
         if (pageMatch) {
@@ -390,7 +405,7 @@
             progressFill.style.width = `${progress}%`;
             progressPercent.textContent = progress;
             setRingProgress(progress);
-            progressMessage.textContent = localizeProgressMessage(data.message);
+            progressMessage.textContent = localizeProgressMessage(data.message, data.meta);
 
             if (data.stage === 'done') {
                 eventSource.close();

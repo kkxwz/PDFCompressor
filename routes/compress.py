@@ -138,6 +138,10 @@ def get_progress(task_id: str) -> Response | tuple[Response, int]:
                     "progress": current_progress,
                     "message": task.stage_message,
                 }
+                # Machine-readable stage key so the frontend can localize
+                # without regex-parsing the English message (kept as fallback)
+                if task.stage_meta:
+                    data["meta"] = task.stage_meta
 
                 if current_status == TaskStatus.DONE and task.result:
                     data["result"] = task.result
