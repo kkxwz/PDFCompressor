@@ -13,8 +13,6 @@ import os
 import sys
 import platform
 
-block_cipher = None
-
 # Project root directory (SPECPATH is a PyInstaller built-in variable pointing to spec file dir)
 PROJECT_DIR = SPECPATH
 
@@ -107,11 +105,10 @@ a = Analysis(
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=block_cipher,
     noarchive=False,
 )
 
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure, a.zipped_data)
 
 # ========== Executable ==========
 exe_options = dict(
@@ -160,8 +157,9 @@ else:
     # Windows/Linux: generate single-file exe
     exe_options['name'] = 'SlimPDF'
     exe_options['icon'] = None  # Can set .ico icon file path here
-    exe_options['binaries'] = a.binaries
-    exe_options['zipfiles'] = a.zipfiles
-    exe_options['datas'] = a.datas
     exe_options['exclude_binaries'] = False
-    exe = EXE(**exe_options)
+    # NOTE: binaries/zipfiles/datas must be passed as POSITIONAL args;
+    # PyInstaller's EXE only collects content from *args and silently
+    # ignores them in **kwargs (kwargs produced a bootloader-only stub).
+    exe = EXE(pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [],
+              **exe_options)

@@ -4,10 +4,10 @@
 
 ---
 
-## 一、项目现状（2026-08-30 第四次更新）
+## 一、项目现状（2026-08-31 第五次更新）
 
-- **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。当前版本 **1.1.0**（`__version__.py`）。
-- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；2026-08-30 完成安全加固（归档②）与测试补齐 + SSE 结构化重构（归档①）。
+- **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。当前版本 **1.1.1**（`__version__.py`）。
+- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；2026-08-30 完成安全加固（归档②）与测试补齐 + SSE 结构化重构（归档①）；2026-08-31 修复 Windows onefile 空壳历史缺陷并重新发版（见文末最新归档）。
 - **国际化**：前端已接入 zh/en 双语切换；SSE 进度消息已结构化（后端 `meta` 字段，前端优先用 key 映射，英文正则仅作兼容兑底）。
 - **测试**：`pytest` 61/61 通过（新增 test_engine_flow.py 11 例 + test_task_manager.py 7 例，原缺口已补齐）；`mypy`（strict）全量通过（13 文件）。
 - **CI**：test 门禁为 Python 3.10/3.11/3.12/3.13 矩阵；release job 仅稳定 tag 触发（含 `-` 的预发布 tag 只跑构建不发 Release）；依赖统一从 `requirements.lock` 安装（已审计无已知 CVE）。
@@ -36,6 +36,7 @@
 16. **SSE 进度事件带 `meta` 结构字段**（`{"key": analyzing|processing|page|complete}`，page 附 `current`/`total`）：前端 `localizeProgressMessage` 优先用 meta，英文 `message` 仅作兼容兑底；新增进度阶段时必须同时产出 meta，并在前端 `META_KEY_TO_LOCALE` 登记。
 17. **`compress_pdf` 进度回调为三参** `(progress, message, meta=None)`：mock 该回调的测试/代码需用 `lambda p, m, meta=None` 签名；预发布 tag（含 `-`）不会触发 release job。
 18. **windows-11-arm runner 上 x64 仿真安装器会无限挂起**：`choco install`（rc.1 实测 >25 分钟）与官方安装包 `gs10071w64.exe` 的 `/S` 静默安装（rc.2 实测 >20 分钟）均挂起，而同一脚本在 x64 上约 2 分钟。最终方案（`b51234c`）：用 runner 预装的 `C:\Program Files\7-Zip\7z.exe` 直接解包自解压安装包，从 `bin/` 拷出 `gswin64c.exe`/dll/lib，完全不执行安装程序；**已验证**：`v1.1.0-rc.3` 全绿（七项 job 全过，release 正确跳过）。arm64 job 里不要再引入任何安装器型依赖。
+19. **PyInstaller 的 `EXE(...)` 只从位置参数收集打包内容**：`binaries`/`zipfiles`/`datas` 若以 `**kwargs` 传入会被**静默忽略**，产出仅剩引导器的空壳 exe（v1.0.0〜v1.1.0 的 Windows 产物均为此类，约 0.3MB；用 `pyi-archive_viewer --brief` 可见 PKG 内无条目）。`build.spec` 已改为位置参数传参（陷阱来源：本地 6.22.2 二分复现）。macOS 用 COLLECT 不受影响；发布前必须核对产物体积（Windows onefile 预期 ≥10MB）。
 
 ## 四、代码索引
 
@@ -73,6 +74,33 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 # ⛔ 停止标识
 
 > 以下为历史归档，可在 token 清理时安全截断。按时间倒序排列（最新在前）。
+
+---
+
+## ✅ 已完成：2026-08-31 Windows onefile 空壳缺陷修复与重发版（v1.1.1）
+
+### 需求与发现过程
+
+- 用户报告 `git push origin v1.1.0` 超时（网络抖动，重试后成功）；v1.1.0 流水线全绿并发出 Release，但例行核对发现产物异常：`SlimPDF-Windows-x64.exe`/`-arm64.exe` 仅 0.3MB（macOS dmg 17.1MB 正常）。
+- 解剖：`file` 显示 PE32+ console 可执行；`strings`/`xxd` 确认只有引导器（尾邻 `python312.dll`，无 CArchive cookie）；`pyi-archive_viewer --brief` 显示 PKG 内除 `pyi-contents-directory _internal` 选项外无任何条目。
+- 拉取 CI 日志（钥匙串 GitHub 凭据）：Analysis/PYZ 均正常（flask/werkzeug 已入图、python312.dll 已收集），但 `Building PKG (CArchive)` 仅耗时约 1ms → TOC 为空；rc.3 的 x64 与 arm64 同样症状。
+- 历史回溯：v1.0.0 的 `PDFCompressor.exe` 同为 0.34MB → 确认是从未好过的历史缺陷（此前下载量 0 未被发现）；macOS 用 COLLECT（onedir）不受影响。
+- 本地复现二分（PyInstaller 6.22.2，与 CI 同版本）：位置参数传 `a.binaries/a.zipfiles/a.datas` → 12MB 正常；`exe_options` dict + `EXE(**exe_options)` kwargs 传参 → 107KB 空壳；`cipher` 参数非原因。源码确认：`EXE.__init__` 仅遍历 `*args` 收集内容，`kwargs.get` 列表里没有 binaries/zipfiles/datas。
+
+### 修复内容（逐文件）
+
+- `build.spec`：Windows/Linux 分支改为 `EXE(pyz, a.scripts, a.binaries, a.zipfiles, a.datas, [], **exe_options)`（位置参数）；移除已废弃的 `block_cipher`/`cipher=` 参数；加注释警示勿改回 kwargs。
+- `__version__.py`：1.1.0 → 1.1.1。
+- 发布处置：删除远端 `v1.1.0` tag 与对应 Release（产物全部损坏且下载量 0），改发 `v1.1.1`。
+
+### 验证结果
+
+- 本地用 `platform.system` 补丁模拟 Windows 分支跑修复后的 `build.spec`：PKG 构建 1.8s、产物 12.1MB（本地无 gs 供应商目录故未含 gs，实机含 gs 约 40MB）；空壳时 PKG 仅 1ms。
+- 待确认：`v1.1.1` 流水线全绿且 Release 三产物体积正常（Windows exe 预期 ≥10MB）。
+
+### 未处理遗留
+
+- 无（若 v1.1.1 流水线异常再跟进）。
 
 ---
 
