@@ -96,7 +96,7 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 ### 验证结果
 
 - 本地用 `platform.system` 补丁模拟 Windows 分支跑修复后的 `build.spec`：PKG 构建 1.8s、产物 12.1MB（本地无 gs 供应商目录故未含 gs，实机含 gs 约 40MB）；空壳时 PKG 仅 1ms。
-- 待确认：`v1.1.1` 流水线全绿且 Release 三产物体积正常（Windows exe 预期 ≥10MB）。
+- **`v1.1.1` 流水线全绿**（run 33349239640）：Release 三产物体积正常——macOS dmg 17.1MB、Windows-x64.exe **26.0MB**、Windows-arm64.exe **25.9MB**（空壳时代为 0.3MB）；CI 日志确认 PKG 构建耗时 5.15s（空壳时 1ms）。远端 `v1.1.0` tag 与 Release 已删除（产物损坏且下载量 0）。
 
 ### 未处理遗留
 
