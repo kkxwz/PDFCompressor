@@ -89,6 +89,22 @@ Go to [Releases](https://github.com/kkxwz/PDFCompressor/releases) for the latest
 - **Windows**: Windows 10 64-bit or later
 - No additional Ghostscript installation required (bundled)
 
+### 🚀 First-Run Guide (one time only)
+
+This is a free, open-source project without a code-signing certificate, so your OS will ask once on first launch. **This is a normal security prompt — two clicks and you're set.** After that, just double-click as usual.
+
+**Windows users**
+
+1. Double-click the exe. If you see "Windows protected your PC" (SmartScreen):
+2. Click **"More info"** → then **"Run anyway"**
+3. If an antivirus flags it, choose "Allow". The app runs fully offline, the source code is public, and nothing is ever uploaded.
+
+**macOS users**
+
+1. If you see "cannot be opened because the developer cannot be verified": **right-click** SlimPDF → **"Open"** → click **"Open"** again in the dialog.
+2. Or: System Settings → Privacy & Security → scroll down → **"Open Anyway"**.
+3. One time only — afterwards it opens with a normal double-click.
+
 ---
 
 ## 🛠️ Tech Stack

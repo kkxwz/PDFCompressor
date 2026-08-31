@@ -4,10 +4,10 @@
 
 ---
 
-## 一、项目现状（2026-08-31 第五次更新）
+## 一、项目现状（2026-08-31 第六次更新）
 
-- **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。当前版本 **1.1.1**（`__version__.py`）。
-- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；2026-08-30 完成安全加固（归档②）与测试补齐 + SSE 结构化重构（归档①）；2026-08-31 修复 Windows onefile 空壳历史缺陷并重新发版（见文末最新归档）。
+- **产品**：SlimPDF —— 本地 PDF 压缩桌面应用（Flask + Ghostscript + PyInstaller 打包），Web UI 绑定 127.0.0.1，单用户使用。当前版本 **1.1.2**（`__version__.py`）。
+- **主分支状态**：核心压缩链路（上传 → 压缩 → SSE 进度 → 下载）已通过全量修复与真实 Ghostscript 端到端验证；2026-08-30 完成安全加固（归档②）与测试补齐 + SSE 结构化重构（归档①）；2026-08-31 修复 Windows onefile 空壳历史缺陷并重发版（归档：空壳修复）；随后完成分发体验优化（窗口模式 + 应用图标 + 首次运行指引，发版 1.1.2，见文末最新归档）。
 - **国际化**：前端已接入 zh/en 双语切换；SSE 进度消息已结构化（后端 `meta` 字段，前端优先用 key 映射，英文正则仅作兼容兑底）。
 - **测试**：`pytest` 61/61 通过（新增 test_engine_flow.py 11 例 + test_task_manager.py 7 例，原缺口已补齐）；`mypy`（strict）全量通过（13 文件）。
 - **CI**：test 门禁为 Python 3.10/3.11/3.12/3.13 矩阵；release job 仅稳定 tag 触发（含 `-` 的预发布 tag 只跑构建不发 Release）；依赖统一从 `requirements.lock` 安装（已审计无已知 CVE）。
@@ -37,6 +37,7 @@
 17. **`compress_pdf` 进度回调为三参** `(progress, message, meta=None)`：mock 该回调的测试/代码需用 `lambda p, m, meta=None` 签名；预发布 tag（含 `-`）不会触发 release job。
 18. **windows-11-arm runner 上 x64 仿真安装器会无限挂起**：`choco install`（rc.1 实测 >25 分钟）与官方安装包 `gs10071w64.exe` 的 `/S` 静默安装（rc.2 实测 >20 分钟）均挂起，而同一脚本在 x64 上约 2 分钟。最终方案（`b51234c`）：用 runner 预装的 `C:\Program Files\7-Zip\7z.exe` 直接解包自解压安装包，从 `bin/` 拷出 `gswin64c.exe`/dll/lib，完全不执行安装程序；**已验证**：`v1.1.0-rc.3` 全绿（七项 job 全过，release 正确跳过）。arm64 job 里不要再引入任何安装器型依赖。
 19. **PyInstaller 的 `EXE(...)` 只从位置参数收集打包内容**：`binaries`/`zipfiles`/`datas` 若以 `**kwargs` 传入会被**静默忽略**，产出仅剩引导器的空壳 exe（v1.0.0〜v1.1.0 的 Windows 产物均为此类，约 0.3MB；用 `pyi-archive_viewer --brief` 可见 PKG 内无条目）。`build.spec` 已改为位置参数传参（陷阱来源：本地 6.22.2 二分复现）。macOS 用 COLLECT 不受影响；发布前必须核对产物体积（Windows onefile 预期 ≥10MB）。
+20. **Windows 打包为窗口模式（`console=False`）后 `sys.stdout`/`sys.stderr` 为 None**：任何 `print()` 或默认 `logging.StreamHandler()` 都会在启动时崩溃；`app.py` 已改为仅在 `sys.stderr is not None` 时加 StreamHandler、空时兼底 `NullHandler`，启动横幅改走 `logger.info`。产物未签名：Windows 首次运行有 SmartScreen 提示、macOS 有 Gatekeeper 拦截，放行步骤已写入两份 README 的「首次运行指引」。
 
 ## 四、代码索引
 
@@ -74,6 +75,32 @@ bash scripts/build_mac.sh         # 本地打包 macOS
 # ⛔ 停止标识
 
 > 以下为历史归档，可在 token 清理时安全截断。按时间倒序排列（最新在前）。
+
+---
+
+## ✅ 已完成：2026-08-31 分发体验优化：窗口模式 + 图标 + 首次运行指引（v1.1.2）
+
+### 需求背景（原始记录）
+
+- 用户询问“别人直接下载安装就能用吗？”——结论：基本可用但有两道门槛：Windows SmartScreen（未签名）与 macOS Gatekeeper（未签名/未公证）；另 Windows 产物带黑色控制台窗口（`console=True`）、无应用图标。
+- 用户决策：付费方案（代码签名/公证）暂不做，只做零成本改进 + 友好指引。
+
+### 实施内容（逐文件）
+
+- `build.spec`：`console=True` → `console=False`（窗口模式）；从 `static/images/logo.png` 生成 `logo.ico`（PIL 多尺寸 16〜256）与 `logo.icns`（sips + iconutil），分别接入 Windows `EXE icon=` 与 macOS `BUNDLE icon=`（均带文件存在性保护）。
+- `app.py`（窗口模式防崩）：`_setup_logging()` 仅在 `sys.stderr is not None` 时添加 StreamHandler，无任何 handler 时兼底 `NullHandler`；启动横幅 6 行 `print()` 改为单条 `logger.info`（frozen 模式日志落盘 APP_DIR/logs）。
+- `README.md` / `README.en.md`：新增「首次运行指引（只需一次）」——SmartScreen「更多信息 → 仍要运行」、Gatekeeper「右键 → 打开」及「隐私与安全性 → 仍要打开」，并说明离线/开源背景消除用户顾虑。
+- `__version__.py`：1.1.1 → 1.1.2（产物形态变化，需重新发版）。
+- 签名类方案（Apple 开发者 $99/年、Windows OV 证书）已在对话中向用户说明，待其后续决策。
+
+### 验证结果（原始记录）
+
+- `pytest` 61/61；`mypy` strict Success（13 文件）；本机构建 macOS 分支成功且 `dist/SlimPDF.app/Contents/Resources/logo.icns` 已嵌入。
+- 待确认：`v1.1.2` 流水线全绿、产物体积正常（≥10MB）、CI 日志出现 `Copying icons from ...logo.ico`。
+
+### 未处理遗留
+
+- 代码签名/公证（付费）待用户决策；未做前用户需按 README 首次运行指引手动放行。
 
 ---
 

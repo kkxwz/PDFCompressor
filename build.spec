@@ -111,12 +111,17 @@ a = Analysis(
 pyz = PYZ(a.pure, a.zipped_data)
 
 # ========== Executable ==========
+# Icons generated from static/images/logo.png (logo.ico / logo.icns)
+_ICON_ICO = os.path.join(PROJECT_DIR, 'static', 'images', 'logo.ico')
+_ICON_ICNS = os.path.join(PROJECT_DIR, 'static', 'images', 'logo.icns')
+
 exe_options = dict(
     pyz=pyz,
     scripts=a.scripts,
     strip=False,
     upx=True,
-    console=True,         # Keep console window for log output
+    console=False,        # Windowed app; logs go to APP_DIR/logs instead
+                          # (app.py guards against a missing console)
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -142,7 +147,7 @@ if system == 'Darwin':
     app = BUNDLE(
         coll,
         name='SlimPDF.app',
-        icon=None,  # Can set .icns icon file path here
+        icon=_ICON_ICNS if os.path.isfile(_ICON_ICNS) else None,
         bundle_identifier='com.tools.pdfcompressor',
         info_plist={
             'NSHighResolutionCapable': True,
@@ -156,7 +161,7 @@ if system == 'Darwin':
 else:
     # Windows/Linux: generate single-file exe
     exe_options['name'] = 'SlimPDF'
-    exe_options['icon'] = None  # Can set .ico icon file path here
+    exe_options['icon'] = _ICON_ICO if os.path.isfile(_ICON_ICO) else None
     exe_options['exclude_binaries'] = False
     # NOTE: binaries/zipfiles/datas must be passed as POSITIONAL args;
     # PyInstaller's EXE only collects content from *args and silently

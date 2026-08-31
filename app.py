@@ -45,9 +45,14 @@ _SECURITY_HEADERS = {
 
 
 def _setup_logging() -> None:
-    """Console logging always; in frozen (desktop) mode also persist logs to
-    APP_DIR/logs so user-side issues can be diagnosed after the fact"""
-    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    """Console logging when a console exists; in frozen (desktop) mode also
+    persist logs to APP_DIR/logs so user-side issues can be diagnosed after
+    the fact. The Windows build is windowed (no console): sys.stderr is
+    None there, so a StreamHandler would crash on first write."""
+    handlers: list[logging.Handler] = []
+
+    if sys.stderr is not None:
+        handlers.append(logging.StreamHandler())
 
     if config.is_frozen():
         log_dir = os.path.join(config.APP_DIR, "logs")
@@ -61,6 +66,10 @@ def _setup_logging() -> None:
             ))
         except OSError:
             pass  # Logging must never block startup
+
+    if not handlers:
+        # Windowed frozen build whose log dir could not be created
+        handlers.append(logging.NullHandler())
 
     logging.basicConfig(
         level=logging.INFO,
@@ -213,15 +222,13 @@ if __name__ == "__main__":
 
     signal.signal(signal.SIGTERM, _handle_sigterm)
 
-    # Delayed browser open (auto-open in both frozen and production mode)
+    # Delayed browser open (auto-open in both frozen and production mode).
+    # logger.info instead of print(): the windowed Windows build has no
+    # stdout, so print() would raise on startup.
     if not config.DEBUG:
         threading.Timer(1.5, open_browser).start()
-        print(f"\n{'=' * 50}")
-        print(f"  SlimPDF started")
-        print(f"  Browser will auto-open. If not, visit:")
-        print(f"  http://{config.HOST}:{config.PORT}")
-        print(f"  Press Ctrl+C to exit")
-        print(f"{'=' * 50}\n")
+        logger.info("SlimPDF started; browser will auto-open. If not, visit "
+                    f"http://{config.HOST}:{config.PORT}")
 
     # Start server
     app.run(
